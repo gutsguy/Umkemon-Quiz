@@ -30,7 +30,16 @@
   .screen h2 { font-size: 1.3rem; color: #ccc; }
 
   /* 메인 화면 */
-  .main-buttons { display: flex; gap: 16px; }
+  .main-hero { text-align: center; }
+  .main-hero h1 { margin-bottom: 4px; }
+  .main-sub { color: #888; font-size: 1rem; }
+  .main-buttons { display: flex; gap: 16px; margin-top: 8px; }
+  .main-leaderboard {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 12px;
+    margin-top: 16px; width: 100%; max-width: 420px;
+  }
+  .main-leaderboard h2 { font-size: 1.2rem; color: #aaa; }
   .btn-mode {
     font-size: 1.3rem;
     padding: 20px 40px;
@@ -233,8 +242,10 @@
 
 <!-- 1. 메인 화면 -->
 <div class="screen active" id="mainScreen">
-  <h1>엄켓몬 실루엣 퀴즈</h1>
-  <h2>게임 모드를 선택하세요</h2>
+  <div class="main-hero">
+    <h1>엄켓몬 실루엣 퀴즈</h1>
+    <p class="main-sub">게임 모드를 선택하세요</p>
+  </div>
 
   <div class="main-buttons">
     <button class="btn-mode practice" onclick="goToSettings('practice')">
@@ -247,13 +258,15 @@
     </button>
   </div>
 
-  <h2>랭크 리더보드</h2>
-  <div class="lb-tabs">
-    <button class="lb-tab active" data-quiz="pixelate" onclick="switchLbTab('pixelate')">픽셀화</button>
-    <button class="lb-tab" data-quiz="silhouette" onclick="switchLbTab('silhouette')">실루엣</button>
-  </div>
-  <div class="leaderboard" id="leaderboard">
-    <p class="lb-empty">로딩 중...</p>
+  <div class="main-leaderboard">
+    <h2>랭크 리더보드</h2>
+    <div class="lb-tabs">
+      <button class="lb-tab active" data-quiz="pixelate" onclick="switchLbTab('pixelate')">픽셀화</button>
+      <button class="lb-tab" data-quiz="silhouette" onclick="switchLbTab('silhouette')">실루엣</button>
+    </div>
+    <div class="leaderboard" id="leaderboard">
+      <p class="lb-empty">로딩 중...</p>
+    </div>
   </div>
 </div>
 

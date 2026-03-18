@@ -85,11 +85,15 @@
     border: none;
     cursor: pointer;
   }
+
+  /* 시작 버튼 */
+  .start-buttons {
+    display: flex;
+    gap: 16px;
+  }
   .btn-start {
-    background: #00b894;
-    color: #fff;
     font-size: 1.3rem;
-    padding: 14px 48px;
+    padding: 14px 36px;
     border-radius: 12px;
     border: none;
     cursor: pointer;
@@ -100,7 +104,10 @@
   .btn-start:disabled {
     background: #444;
     cursor: not-allowed;
+    color: #888;
   }
+  .btn-practice { background: #00b894; color: #fff; }
+  .btn-ranked { background: #e94560; color: #fff; }
 
   /* 게임 화면 */
   .game-screen { display: none; }
@@ -135,6 +142,30 @@
     color: #555;
     font-size: 1.2rem;
   }
+
+  /* 타이머 바 */
+  .timer-bar {
+    width: 320px;
+    height: 8px;
+    background: #0f3460;
+    border-radius: 4px;
+    overflow: hidden;
+    display: none;
+  }
+  .timer-fill {
+    height: 100%;
+    background: #00b894;
+    border-radius: 4px;
+    transition: width 0.1s linear;
+    width: 100%;
+  }
+  .timer-fill.danger { background: #e94560; }
+  .timer-text {
+    font-size: 0.9rem;
+    color: #aaa;
+    display: none;
+  }
+
   .input-area {
     display: flex;
     gap: 8px;
@@ -262,24 +293,77 @@
     color: #fff;
   }
 
-  /* 닉네임 입력 */
-  .nickname-area {
-    display: flex;
-    gap: 8px;
-    align-items: center;
+  /* 게임 모드 뱃지 */
+  .mode-badge {
+    font-size: 0.8rem;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-weight: bold;
+    margin-bottom: 4px;
   }
-  .nickname-area input {
+  .mode-badge.practice { background: #00b894; color: #fff; }
+  .mode-badge.ranked { background: #e94560; color: #fff; }
+
+  /* 게임오버 화면 */
+  .gameover-screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    padding: 20px;
+  }
+  .gameover-screen h1 { color: #e94560; font-size: 2.5rem; }
+  .go-streak {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #ffd32a;
+  }
+  .go-streak-label {
     font-size: 1rem;
-    padding: 8px 14px;
+    color: #888;
+  }
+  .go-answer {
+    text-align: center;
+  }
+  .go-answer .name-reveal {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: #e94560;
+  }
+  .go-answer .name-original {
+    font-size: 0.9rem;
+    color: #888;
+  }
+  .go-nickname {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .go-nickname input {
+    font-size: 1.1rem;
+    padding: 10px 16px;
     border-radius: 8px;
     border: 2px solid #0f3460;
     background: #16213e;
     color: #eee;
     outline: none;
-    width: 160px;
+    width: 200px;
     text-align: center;
   }
-  .nickname-area input:focus { border-color: #e94560; }
+  .go-nickname input:focus { border-color: #e94560; }
+  .btn-save-score {
+    background: #ffd32a;
+    color: #1a1a2e;
+    font-size: 1.1rem;
+    padding: 12px 32px;
+    border-radius: 12px;
+  }
+  .btn-save-score:disabled {
+    background: #555;
+    color: #888;
+    cursor: not-allowed;
+  }
 
   /* 리더보드 */
   .leaderboard {
@@ -337,14 +421,12 @@
     <div class="mode-btn" data-mode="silhouette" onclick="selectMode('silhouette')">실루엣</div>
   </div>
 
-  <h2>닉네임</h2>
-  <div class="nickname-area">
-    <input type="text" id="nicknameInput" placeholder="닉네임 입력" maxlength="10">
+  <div class="start-buttons">
+    <button class="btn-start btn-practice" id="startPractice" onclick="startGame('practice')" disabled>연습모드</button>
+    <button class="btn-start btn-ranked" id="startRanked" onclick="startGame('ranked')" disabled>랭크모드</button>
   </div>
 
-  <button class="btn-start" id="startBtn" onclick="startGame()" disabled>시작하기</button>
-
-  <h2>리더보드</h2>
+  <h2>랭크 리더보드</h2>
   <div class="leaderboard" id="leaderboard">
     <p class="lb-empty">로딩 중...</p>
   </div>
@@ -352,6 +434,7 @@
 
 <!-- 게임 화면 -->
 <div class="game-screen" id="gameScreen">
+  <span class="mode-badge" id="modeBadge"></span>
   <h1>엄켓몬 퀴즈</h1>
   <p class="score">
     연속 정답: <span id="streak">0</span> | 최대 연속: <span id="best">0</span> | 총 정답: <span id="total">0</span>
@@ -359,6 +442,11 @@
   </p>
 
   <div class="game-area">
+    <div class="timer-text" id="timerText">15.0초</div>
+    <div class="timer-bar" id="timerBar">
+      <div class="timer-fill" id="timerFill"></div>
+    </div>
+
     <div class="image-container" id="imageContainer">
       <canvas id="canvas"></canvas>
       <img id="originalImg" crossorigin="anonymous">
@@ -372,13 +460,23 @@
       <button class="btn-submit" id="submitBtn">확인</button>
     </div>
 
-    <div class="buttons-row" id="buttonsRow">
-      <button class="btn-hint" id="hintBtn">힌트</button>
-      <button class="btn-skip" id="skipBtn">스킵</button>
-    </div>
+    <div class="buttons-row" id="buttonsRow"></div>
 
     <button class="btn-back" onclick="backToSelect()">메뉴로 돌아가기</button>
   </div>
+</div>
+
+<!-- 게임오버 화면 (랭크) -->
+<div class="gameover-screen" id="gameoverScreen">
+  <h1>GAME OVER</h1>
+  <div class="go-streak-label">연속 정답</div>
+  <div class="go-streak" id="goStreak">0</div>
+  <div class="go-answer" id="goAnswer"></div>
+  <div class="go-nickname">
+    <input type="text" id="goNicknameInput" placeholder="닉네임 입력" maxlength="10">
+    <button class="btn-save-score" id="goSaveBtn" onclick="saveAndReturn()">기록 저장</button>
+  </div>
+  <button class="btn-back" onclick="returnToMenu()">메뉴로 돌아가기</button>
 </div>
 
 <script>
@@ -406,20 +504,23 @@ let total = 0;
 let bestStreak = 0;
 let hintUsed = false;
 let waitingNext = false;
-let preloaded = null; // { pokemon, img } 미리 로딩된 다음 문제
-let revealTimer = null;  // 점진적 실루엣 해제 타이머
-let originalPixels = null; // 원본 픽셀 데이터
-let opaqueCoords = []; // 실루엣(불투명) 픽셀 좌표 목록
-const REVEAL_INTERVAL = 3000; // 3초마다 한 단계
-const REVEAL_STEPS = 10; // 총 10단계
+let preloaded = null;
+let revealTimer = null;
+let originalPixels = null;
+let opaqueCoords = [];
+const REVEAL_INTERVAL = 3000;
+const REVEAL_STEPS = 10;
 let revealStep = 0;
 
-// ──────────────────────────────────────────────
-// 실루엣 모드 설정: "silhouette" | "pixelate"
-// ──────────────────────────────────────────────
 let SILHOUETTE_MODE = "pixelate";
-const PIXEL_BLOCK_START = 40; // 픽셀화 초기 블록 크기
-const PIXEL_BLOCK_END = 1;   // 최종 블록 크기 (1 = 원본)
+const PIXEL_BLOCK_START = 40;
+const PIXEL_BLOCK_END = 1;
+
+// ── 게임 모드: "practice" | "ranked" ──
+let gameMode = "practice";
+const RANKED_TIME = 15; // 초
+let roundTimerInterval = null;
+let timeLeft = RANKED_TIME;
 
 // 세대 선택 버튼 생성
 function initGenGrid() {
@@ -442,7 +543,9 @@ function toggleGen(gen, btn) {
     selectedGens.add(gen);
     btn.classList.add("active");
   }
-  document.getElementById("startBtn").disabled = selectedGens.size === 0;
+  const disabled = selectedGens.size === 0;
+  document.getElementById("startPractice").disabled = disabled;
+  document.getElementById("startRanked").disabled = disabled;
 }
 
 function toggleAll() {
@@ -455,7 +558,9 @@ function toggleAll() {
     GENERATIONS.forEach(g => selectedGens.add(g.gen));
     btns.forEach(b => b.classList.add("active"));
   }
-  document.getElementById("startBtn").disabled = selectedGens.size === 0;
+  const disabled = selectedGens.size === 0;
+  document.getElementById("startPractice").disabled = disabled;
+  document.getElementById("startRanked").disabled = disabled;
 }
 
 function selectMode(mode) {
@@ -465,9 +570,53 @@ function selectMode(mode) {
   });
 }
 
-// 게임 시작
-function startGame() {
-  // 선택된 세대의 ID 범위 합치기
+// ── 타이머 ──
+function startRoundTimer() {
+  timeLeft = RANKED_TIME;
+  const timerBar = document.getElementById("timerBar");
+  const timerFill = document.getElementById("timerFill");
+  const timerText = document.getElementById("timerText");
+  timerBar.style.display = "block";
+  timerText.style.display = "block";
+  timerFill.style.width = "100%";
+  timerFill.classList.remove("danger");
+  timerText.textContent = RANKED_TIME.toFixed(1) + "초";
+
+  roundTimerInterval = setInterval(() => {
+    timeLeft -= 0.1;
+    if (timeLeft <= 0) {
+      timeLeft = 0;
+      stopRoundTimer();
+      timeUp();
+    }
+    const pct = (timeLeft / RANKED_TIME) * 100;
+    timerFill.style.width = pct + "%";
+    timerText.textContent = timeLeft.toFixed(1) + "초";
+    if (timeLeft <= 5) timerFill.classList.add("danger");
+  }, 100);
+}
+
+function stopRoundTimer() {
+  if (roundTimerInterval) {
+    clearInterval(roundTimerInterval);
+    roundTimerInterval = null;
+  }
+}
+
+function hideTimer() {
+  stopRoundTimer();
+  document.getElementById("timerBar").style.display = "none";
+  document.getElementById("timerText").style.display = "none";
+}
+
+function timeUp() {
+  gameOver("timeout");
+}
+
+// ── 게임 시작 ──
+function startGame(mode) {
+  gameMode = mode;
+
   allowedIds = [];
   for (const g of GENERATIONS) {
     if (selectedGens.has(g.gen)) {
@@ -477,6 +626,16 @@ function startGame() {
 
   const genLabels = GENERATIONS.filter(g => selectedGens.has(g.gen)).map(g => g.label).join(", ");
   document.getElementById("genInfo").textContent = `| ${genLabels}`;
+
+  // 모드 뱃지
+  const badge = document.getElementById("modeBadge");
+  if (mode === "ranked") {
+    badge.textContent = "랭크모드";
+    badge.className = "mode-badge ranked";
+  } else {
+    badge.textContent = "연습모드";
+    badge.className = "mode-badge practice";
+  }
 
   streak = 0;
   total = 0;
@@ -494,11 +653,18 @@ function startGame() {
 }
 
 function backToSelect() {
+  hideTimer();
+  stopReveal();
   document.getElementById("gameScreen").style.display = "none";
   document.getElementById("selectScreen").style.display = "flex";
 }
 
-// 엄켓몬 이름 변환 (노 제외)
+function returnToMenu() {
+  document.getElementById("gameoverScreen").style.display = "none";
+  document.getElementById("selectScreen").style.display = "flex";
+}
+
+// 엄켓몬 이름 변환
 function toUmkemon(name) {
   const first = name[0];
   let count = 1;
@@ -506,7 +672,7 @@ function toUmkemon(name) {
   return "엄".repeat(count) + name.slice(count);
 }
 
-// ── 도감 설명 엄켓몬 변환 (umkedex.py 로직) ──
+// ── 도감 설명 엄켓몬 변환 ──
 function isKorean(ch) {
   return ch >= "\uac00" && ch <= "\ud7a3";
 }
@@ -534,10 +700,8 @@ function umkemonText(text, nameSet) {
   ).join(" ").trim();
 }
 
-// 포켓몬 한글 이름 캐시 (도감 설명 변환용)
 const koNameCache = new Set();
 
-// 랜덤 포켓몬 fetch
 async function fetchRandomPokemon() {
   const id = allowedIds[Math.floor(Math.random() * allowedIds.length)];
 
@@ -556,15 +720,13 @@ async function fetchRandomPokemon() {
 
   if (!koName) return fetchRandomPokemon();
 
-  // 이름 캐시에 추가
   koNameCache.add(koName);
 
-  // 한글 도감 설명 추출 (x 버전 우선, 없으면 최신 한글 항목)
   let koFlavor = null;
   for (const entry of speciesRes.flavor_text_entries) {
     if (entry.language.name !== "ko") continue;
     if (entry.version.name === "x") { koFlavor = entry.flavor_text; break; }
-    koFlavor = entry.flavor_text; // 최신 한글 항목으로 fallback
+    koFlavor = entry.flavor_text;
   }
 
   const types = pokemonRes.types.map(t => {
@@ -581,7 +743,6 @@ async function fetchRandomPokemon() {
   return { id, koName, umName: toUmkemon(koName), types, koFlavor };
 }
 
-// 다음 문제 미리 로딩
 function preloadNext() {
   preloaded = null;
   fetchRandomPokemon().then(pokemon => {
@@ -589,12 +750,12 @@ function preloadNext() {
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => { preloaded = { pokemon, img }; };
-    img.onerror = () => { preloadNext(); }; // 실패 시 재시도
+    img.onerror = () => { preloadNext(); };
     img.src = url;
   });
 }
 
-// ── 공통: 캔버스 초기화 + 원본 저장 ──
+// ── 캔버스 ──
 function initCanvas(img) {
   const canvas = document.getElementById("canvas");
   const ctx = canvas.getContext("2d");
@@ -614,7 +775,6 @@ function initCanvas(img) {
   return { canvas, ctx };
 }
 
-// ── 모드: 검정 실루엣 ──
 const silhouetteMode = {
   draw(img) {
     const { canvas, ctx } = initCanvas(img);
@@ -653,7 +813,6 @@ const silhouetteMode = {
   }
 };
 
-// ── 모드: 픽셀화 ──
 const pixelateMode = {
   draw(img) {
     const { canvas, ctx } = initCanvas(img);
@@ -696,7 +855,6 @@ const pixelateMode = {
   }
 };
 
-// ── 모드 맵 ──
 const MODES = { silhouette: silhouetteMode, pixelate: pixelateMode };
 
 function drawSilhouette(img) {
@@ -726,6 +884,7 @@ function showOriginal() {
   img.style.display = "block";
 }
 
+// ── 라운드 시작 ──
 async function newRound() {
   const loading = document.getElementById("loadingText");
   const canvas = document.getElementById("canvas");
@@ -736,56 +895,65 @@ async function newRound() {
   const answerInput = document.getElementById("answerInput");
 
   stopReveal();
+  hideTimer();
   canvas.style.display = "none";
   originalImg.style.display = "none";
   loading.style.display = "block";
   resultArea.innerHTML = "";
   inputArea.style.display = "flex";
-  buttonsRow.innerHTML = `
-    <button class="btn-hint" onclick="showHint()">힌트 (Ctrl+1)</button>
-    <button class="btn-skip" onclick="skip()">스킵 (Ctrl+2)</button>
-  `;
   answerInput.value = "";
   answerInput.disabled = false;
   document.getElementById("submitBtn").disabled = false;
   hintUsed = false;
   waitingNext = false;
 
-  if (preloaded) {
-    // 미리 로딩된 데이터 사용
-    const { pokemon, img } = preloaded;
-    preloaded = null;
+  // 모드별 버튼
+  if (gameMode === "practice") {
+    buttonsRow.innerHTML = `
+      <button class="btn-hint" onclick="showHint()">힌트 (Ctrl+1)</button>
+      <button class="btn-skip" onclick="skip()">스킵 (Ctrl+2)</button>
+    `;
+  } else {
+    buttonsRow.innerHTML = "";
+  }
+
+  const onImageReady = (pokemon, img) => {
     currentPokemon = pokemon;
     loading.style.display = "none";
     canvas.style.display = "block";
     drawSilhouette(img);
     originalImg.src = `${ARTWORK_BASE}/${currentPokemon.id}.png`;
     answerInput.focus();
+    if (gameMode === "ranked") startRoundTimer();
+  };
+
+  if (preloaded) {
+    const { pokemon, img } = preloaded;
+    preloaded = null;
+    onImageReady(pokemon, img);
   } else {
-    // 프리로드 없으면 직접 fetch
     currentPokemon = await fetchRandomPokemon();
     const artworkUrl = `${ARTWORK_BASE}/${currentPokemon.id}.png`;
     const img = new Image();
     img.crossOrigin = "anonymous";
-    img.onload = () => {
-      loading.style.display = "none";
-      canvas.style.display = "block";
-      drawSilhouette(img);
-      originalImg.src = artworkUrl;
-      answerInput.focus();
-    };
+    img.onload = () => onImageReady(currentPokemon, img);
     img.onerror = () => newRound();
     img.src = artworkUrl;
   }
 }
 
+// ── 정답 체크 ──
 function checkAnswer() {
+  if (waitingNext) return;
   const input = document.getElementById("answerInput");
   const answer = input.value.trim();
   if (!answer) return;
 
   const strip = s => s.replace(/[♂♀]/g, "");
-  if (answer === currentPokemon.umName || answer === strip(currentPokemon.umName)) {
+  const isCorrect = answer === currentPokemon.umName || answer === strip(currentPokemon.umName);
+
+  if (isCorrect) {
+    stopRoundTimer();
     streak++;
     total++;
     if (streak > bestStreak) {
@@ -809,12 +977,20 @@ function checkAnswer() {
     waitingNext = true;
     preloadNext();
   } else {
-    input.classList.add("wrong");
-    setTimeout(() => input.classList.remove("wrong"), 400);
+    // 오답
+    if (gameMode === "ranked") {
+      gameOver("wrong");
+    } else {
+      streak = 0;
+      document.getElementById("streak").textContent = streak;
+      input.classList.add("wrong");
+      setTimeout(() => input.classList.remove("wrong"), 400);
+    }
   }
 }
 
 function showHint() {
+  if (gameMode === "ranked") return;
   if (!currentPokemon || hintUsed) return;
   hintUsed = true;
 
@@ -828,6 +1004,7 @@ function showHint() {
 }
 
 function skip() {
+  if (gameMode === "ranked") return;
   streak = 0;
   document.getElementById("streak").textContent = streak;
   showOriginal();
@@ -845,6 +1022,31 @@ function skip() {
   preloadNext();
 }
 
+// ── 게임오버 (랭크 전용) ──
+function gameOver(reason) {
+  stopRoundTimer();
+  stopReveal();
+
+  document.getElementById("gameScreen").style.display = "none";
+
+  const reasonText = reason === "timeout" ? "시간 초과!" : "오답!";
+
+  document.getElementById("goStreak").textContent = streak;
+  document.getElementById("goAnswer").innerHTML = `
+    <div style="color:#888; font-size:0.9rem; margin-bottom:4px">${reasonText}</div>
+    <div>정답: <span class="name-reveal">${currentPokemon.umName}</span>
+    <span class="name-original">(${currentPokemon.koName})</span></div>
+  `;
+
+  // 닉네임 복원
+  const goInput = document.getElementById("goNicknameInput");
+  goInput.value = localStorage.getItem("umkemon_nickname") || "";
+  document.getElementById("goSaveBtn").disabled = false;
+  document.getElementById("goSaveBtn").textContent = "기록 저장";
+
+  document.getElementById("gameoverScreen").style.display = "flex";
+}
+
 function buildFlavorHtml() {
   if (!currentPokemon.koFlavor) return "";
   const umFlavor = umkemonText(currentPokemon.koFlavor, koNameCache);
@@ -858,29 +1060,25 @@ function buildFlavorHtml() {
 // 이벤트
 document.getElementById("submitBtn").addEventListener("click", checkAnswer);
 document.addEventListener("keydown", (e) => {
+  // 게임오버 화면에서 Enter → 저장
+  if (document.getElementById("gameoverScreen").style.display !== "none"
+      && document.getElementById("gameoverScreen").style.display !== "") {
+    if (e.key === "Enter") saveAndReturn();
+    return;
+  }
+
   if (document.getElementById("gameScreen").style.display === "none") return;
   if (e.key === "Enter") {
     if (waitingNext) newRound();
     else checkAnswer();
-  } else if (e.key === "1" && e.ctrlKey) {
+  } else if (e.key === "1" && e.ctrlKey && gameMode === "practice") {
     e.preventDefault();
     showHint();
-  } else if (e.key === "2" && e.ctrlKey) {
+  } else if (e.key === "2" && e.ctrlKey && gameMode === "practice") {
     e.preventDefault();
     skip();
   }
 });
-
-// ── 닉네임 (localStorage 저장) ──
-const nicknameInput = document.getElementById("nicknameInput");
-nicknameInput.value = localStorage.getItem("umkemon_nickname") || "";
-nicknameInput.addEventListener("change", () => {
-  localStorage.setItem("umkemon_nickname", nicknameInput.value.trim());
-});
-
-function getNickname() {
-  return nicknameInput.value.trim() || "익명";
-}
 
 // 초기화
 initGenGrid();
@@ -905,11 +1103,28 @@ const db = firebase.database();
 
 // ── 리더보드: 점수 저장 ──
 function saveScore(nickname, streakVal) {
-  if (streakVal <= 0) return;
-  db.ref("scores").push({
+  if (streakVal <= 0) return Promise.resolve();
+  return db.ref("scores").push({
     name: nickname,
     streak: streakVal,
     ts: Date.now()
+  });
+}
+
+// ── 게임오버에서 저장 + 메뉴 복귀 ──
+function saveAndReturn() {
+  const btn = document.getElementById("goSaveBtn");
+  if (btn.disabled) return;
+
+  const nickname = document.getElementById("goNicknameInput").value.trim() || "익명";
+  localStorage.setItem("umkemon_nickname", nickname);
+
+  btn.disabled = true;
+  btn.textContent = "저장 중...";
+
+  saveScore(nickname, streak).then(() => {
+    btn.textContent = "저장 완료!";
+    setTimeout(() => returnToMenu(), 800);
   });
 }
 
@@ -926,7 +1141,8 @@ function loadLeaderboard() {
       return;
     }
 
-    const myName = getNickname();
+    const myName = (document.getElementById("goNicknameInput").value.trim()
+      || localStorage.getItem("umkemon_nickname") || "");
     let html = '<table><tr><th>#</th><th>닉네임</th><th>연속 정답</th></tr>';
     entries.forEach((e, i) => {
       const rankClass = i < 3 ? ` rank-${i+1}` : "";
@@ -939,37 +1155,6 @@ function loadLeaderboard() {
   });
 }
 
-// ── 기존 함수 패치: 스트릭 끊길 때 저장 ──
-const _originalSkip = skip;
-skip = function() {
-  if (streak > 0) saveScore(getNickname(), streak);
-  _originalSkip();
-};
-
-const _originalCheckAnswer = checkAnswer;
-checkAnswer = function() {
-  const input = document.getElementById("answerInput");
-  const answer = input.value.trim();
-  if (!answer) return;
-
-  const strip = s => s.replace(/[♂♀]/g, "");
-  const isCorrect = answer === currentPokemon.umName || answer === strip(currentPokemon.umName);
-
-  if (!isCorrect && streak > 0) {
-    saveScore(getNickname(), streak);
-  }
-
-  _originalCheckAnswer();
-};
-
-// 메뉴로 돌아갈 때도 저장
-const _originalBackToSelect = backToSelect;
-backToSelect = function() {
-  if (streak > 0) saveScore(getNickname(), streak);
-  _originalBackToSelect();
-};
-
-// 리더보드 초기 로드
 loadLeaderboard();
 </script>
 </body>

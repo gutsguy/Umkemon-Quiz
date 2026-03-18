@@ -904,15 +904,23 @@ function saveAndReturn() {
   saveScore(nickname, streak).then(() => {
     btn.textContent = "저장 완료!";
     setTimeout(() => goToMain(), 800);
+  }).catch(err => {
+    console.error("점수 저장 실패:", err);
+    btn.textContent = "저장 실패!";
+    btn.disabled = false;
+    alert("저장 실패: " + err.message + "\nFirebase 규칙을 확인하세요.");
   });
 }
 
 // ── 리더보드 로드 (퀴즈 모드별 필터) ──
 function loadLeaderboard() {
   const container = document.getElementById("leaderboard");
-  db.ref("scores").orderByChild("streak").limitToLast(50).once("value", snap => {
+  db.ref("scores").once("value").then(snap => {
     const all = [];
-    snap.forEach(child => all.push(child.val()));
+    snap.forEach(child => {
+      const v = child.val();
+      if (v && typeof v === "object" && v.streak) all.push(v);
+    });
 
     const entries = all
       .filter(e => (e.quizMode || "pixelate") === currentLbTab)
@@ -934,6 +942,9 @@ function loadLeaderboard() {
     });
     html += '</table>';
     container.innerHTML = html;
+  }).catch(err => {
+    console.error("리더보드 로드 실패:", err);
+    container.innerHTML = '<p class="lb-empty">로드 실패 - Firebase 규칙을 확인하세요</p>';
   });
 }
 

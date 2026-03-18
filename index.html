@@ -261,6 +261,61 @@
     border-color: #e94560;
     color: #fff;
   }
+
+  /* 닉네임 입력 */
+  .nickname-area {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .nickname-area input {
+    font-size: 1rem;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 2px solid #0f3460;
+    background: #16213e;
+    color: #eee;
+    outline: none;
+    width: 160px;
+    text-align: center;
+  }
+  .nickname-area input:focus { border-color: #e94560; }
+
+  /* 리더보드 */
+  .leaderboard {
+    width: 100%;
+    max-width: 400px;
+  }
+  .leaderboard table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .leaderboard th {
+    font-size: 0.8rem;
+    color: #666;
+    padding: 6px 8px;
+    text-align: center;
+    border-bottom: 1px solid #333;
+  }
+  .leaderboard td {
+    font-size: 0.9rem;
+    padding: 6px 8px;
+    text-align: center;
+    border-bottom: 1px solid #222;
+  }
+  .leaderboard tr.me td {
+    color: #ffd32a;
+    font-weight: bold;
+  }
+  .leaderboard .rank-1 td:first-child { color: #ffd700; }
+  .leaderboard .rank-2 td:first-child { color: #c0c0c0; }
+  .leaderboard .rank-3 td:first-child { color: #cd7f32; }
+  .lb-empty {
+    color: #555;
+    font-size: 0.9rem;
+    text-align: center;
+    padding: 16px;
+  }
 </style>
 </head>
 <body>
@@ -282,7 +337,17 @@
     <div class="mode-btn" data-mode="silhouette" onclick="selectMode('silhouette')">실루엣</div>
   </div>
 
+  <h2>닉네임</h2>
+  <div class="nickname-area">
+    <input type="text" id="nicknameInput" placeholder="닉네임 입력" maxlength="10">
+  </div>
+
   <button class="btn-start" id="startBtn" onclick="startGame()" disabled>시작하기</button>
+
+  <h2>리더보드</h2>
+  <div class="leaderboard" id="leaderboard">
+    <p class="lb-empty">로딩 중...</p>
+  </div>
 </div>
 
 <!-- 게임 화면 -->
@@ -312,6 +377,7 @@
       <button class="btn-skip" id="skipBtn">스킵</button>
     </div>
 
+    <button class="btn-back" onclick="backToSelect()">메뉴로 돌아가기</button>
   </div>
 </div>
 
@@ -805,8 +871,106 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+// ── 닉네임 (localStorage 저장) ──
+const nicknameInput = document.getElementById("nicknameInput");
+nicknameInput.value = localStorage.getItem("umkemon_nickname") || "";
+nicknameInput.addEventListener("change", () => {
+  localStorage.setItem("umkemon_nickname", nicknameInput.value.trim());
+});
+
+function getNickname() {
+  return nicknameInput.value.trim() || "익명";
+}
+
 // 초기화
 initGenGrid();
+</script>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDVPuTDi9shJbkNXOwSqoyYEeQearaH9Pk",
+  authDomain: "umkemon-quiz.firebaseapp.com",
+  databaseURL: "https://umkemon-quiz-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "umkemon-quiz",
+  storageBucket: "umkemon-quiz.firebasestorage.app",
+  messagingSenderId: "437349864350",
+  appId: "1:437349864350:web:9051969480025170373c8f"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ── 리더보드: 점수 저장 ──
+function saveScore(nickname, streakVal) {
+  if (streakVal <= 0) return;
+  db.ref("scores").push({
+    name: nickname,
+    streak: streakVal,
+    ts: Date.now()
+  });
+}
+
+// ── 리더보드: 불러오기 + 표시 ──
+function loadLeaderboard() {
+  const container = document.getElementById("leaderboard");
+  db.ref("scores").orderByChild("streak").limitToLast(10).on("value", snap => {
+    const entries = [];
+    snap.forEach(child => entries.push(child.val()));
+    entries.sort((a, b) => b.streak - a.streak);
+
+    if (entries.length === 0) {
+      container.innerHTML = '<p class="lb-empty">아직 기록이 없습니다</p>';
+      return;
+    }
+
+    const myName = getNickname();
+    let html = '<table><tr><th>#</th><th>닉네임</th><th>연속 정답</th></tr>';
+    entries.forEach((e, i) => {
+      const rankClass = i < 3 ? ` rank-${i+1}` : "";
+      const meClass = e.name === myName ? " me" : "";
+      const medal = ["🥇","🥈","🥉"][i] || (i+1);
+      html += `<tr class="${rankClass}${meClass}"><td>${medal}</td><td>${e.name}</td><td>${e.streak}</td></tr>`;
+    });
+    html += '</table>';
+    container.innerHTML = html;
+  });
+}
+
+// ── 기존 함수 패치: 스트릭 끊길 때 저장 ──
+const _originalSkip = skip;
+skip = function() {
+  if (streak > 0) saveScore(getNickname(), streak);
+  _originalSkip();
+};
+
+const _originalCheckAnswer = checkAnswer;
+checkAnswer = function() {
+  const input = document.getElementById("answerInput");
+  const answer = input.value.trim();
+  if (!answer) return;
+
+  const strip = s => s.replace(/[♂♀]/g, "");
+  const isCorrect = answer === currentPokemon.umName || answer === strip(currentPokemon.umName);
+
+  if (!isCorrect && streak > 0) {
+    saveScore(getNickname(), streak);
+  }
+
+  _originalCheckAnswer();
+};
+
+// 메뉴로 돌아갈 때도 저장
+const _originalBackToSelect = backToSelect;
+backToSelect = function() {
+  if (streak > 0) saveScore(getNickname(), streak);
+  _originalBackToSelect();
+};
+
+// 리더보드 초기 로드
+loadLeaderboard();
 </script>
 </body>
 </html>

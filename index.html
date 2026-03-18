@@ -241,9 +241,9 @@
       연습모드
       <div class="mode-desc">힌트 / 스킵 / 무제한</div>
     </button>
-    <button class="btn-mode ranked" onclick="goToSettings('ranked')">
+    <button class="btn-mode ranked" onclick="goToRankedSettings()">
       랭크모드
-      <div class="mode-desc">15초 제한 / 1틀 게임오버</div>
+      <div class="mode-desc">전 세대 / 15초 제한 / 1틀 게임오버</div>
     </button>
   </div>
 
@@ -275,6 +275,21 @@
   </div>
 
   <button class="btn-start" id="startBtn" onclick="startGame()" disabled>시작하기</button>
+  <button class="btn-back" onclick="goToMain()">뒤로가기</button>
+</div>
+
+<!-- 2-2. 랭크 설정 화면 (퀴즈모드만) -->
+<div class="screen" id="rankedSelectScreen">
+  <h1 style="color:#e94560">랭크모드</h1>
+  <h2 style="font-size:1rem; color:#888">전 세대 (1~9세대) 포함</h2>
+
+  <h2>퀴즈 모드</h2>
+  <div class="mode-select">
+    <div class="mode-btn active" data-rmode="pixelate" onclick="selectRankedQuizMode('pixelate')">픽셀화</div>
+    <div class="mode-btn" data-rmode="silhouette" onclick="selectRankedQuizMode('silhouette')">실루엣</div>
+  </div>
+
+  <button class="btn-start ranked-start" onclick="startRankedGame()">시작하기</button>
   <button class="btn-back" onclick="goToMain()">뒤로가기</button>
 </div>
 
@@ -367,18 +382,44 @@ function showScreen(id) {
 
 function goToSettings(mode) {
   gameMode = mode;
-  const title = document.getElementById("settingsTitle");
-  const startBtn = document.getElementById("startBtn");
-  if (mode === "ranked") {
-    title.textContent = "랭크모드";
-    title.style.color = "#e94560";
-    startBtn.className = "btn-start ranked-start";
-  } else {
-    title.textContent = "연습모드";
-    title.style.color = "#00b894";
-    startBtn.className = "btn-start";
-  }
+  document.getElementById("settingsTitle").textContent = "연습모드";
+  document.getElementById("settingsTitle").style.color = "#00b894";
+  document.getElementById("startBtn").className = "btn-start";
   showScreen("selectScreen");
+}
+
+function goToRankedSettings() {
+  gameMode = "ranked";
+  showScreen("rankedSelectScreen");
+}
+
+function selectRankedQuizMode(mode) {
+  SILHOUETTE_MODE = mode;
+  document.querySelectorAll("[data-rmode]").forEach(b => {
+    b.classList.toggle("active", b.dataset.rmode === mode);
+  });
+}
+
+function startRankedGame() {
+  // 전 세대 자동 포함
+  allowedIds = [];
+  for (const g of GENERATIONS) {
+    for (let i = g.start; i <= g.end; i++) allowedIds.push(i);
+  }
+
+  document.getElementById("genInfo").textContent = "| 전 세대";
+
+  const badge = document.getElementById("modeBadge");
+  badge.textContent = "랭크모드";
+  badge.className = "mode-badge ranked";
+
+  streak = 0; total = 0; bestStreak = 0;
+  document.getElementById("streak").textContent = 0;
+  document.getElementById("best").textContent = 0;
+  document.getElementById("total").textContent = 0;
+
+  showScreen("gameScreen");
+  newRound();
 }
 
 function goToMain() {

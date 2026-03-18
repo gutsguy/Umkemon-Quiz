@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>엄켓몬 실루엣 퀴즈</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #1a1a2e;
+    color: #eee;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  h1 {
+    font-size: 2rem;
+    margin-bottom: 8px;
+    color: #e94560;
+  }
+  .score {
+    font-size: 1.1rem;
+    color: #aaa;
+    margin-bottom: 24px;
+  }
+
+  /* 세대 선택 화면 */
+  .select-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+  .select-screen h2 {
+    font-size: 1.3rem;
+    color: #ccc;
+  }
+  .gen-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    max-width: 400px;
+  }
+  .gen-btn {
+    font-size: 1rem;
+    padding: 16px 24px;
+    border-radius: 12px;
+    border: 2px solid #0f3460;
+    background: #16213e;
+    color: #888;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    user-select: none;
+  }
+  .gen-btn:hover {
+    border-color: #e94560;
+  }
+  .gen-btn.active {
+    background: #e94560;
+    border-color: #e94560;
+    color: #fff;
+  }
+  .gen-btn .gen-range {
+    font-size: 0.75rem;
+    color: #666;
+    margin-top: 4px;
+  }
+  .gen-btn.active .gen-range {
+    color: #ffccd5;
+  }
+  .select-actions {
+    display: flex;
+    gap: 12px;
+  }
+  .btn-select-all {
+    background: #0f3460;
+    color: #eee;
+    font-size: 0.9rem;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+  }
+  .btn-start {
+    background: #00b894;
+    color: #fff;
+    font-size: 1.3rem;
+    padding: 14px 48px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    transition: transform 0.1s;
+  }
+  .btn-start:active { transform: scale(0.95); }
+  .btn-start:disabled {
+    background: #444;
+    cursor: not-allowed;
+  }
+
+  /* 게임 화면 */
+  .game-screen { display: none; }
+  .game-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+  .image-container {
+    width: 320px;
+    height: 320px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #16213e;
+    border-radius: 16px;
+    border: 2px solid #0f3460;
+    position: relative;
+    overflow: hidden;
+  }
+  canvas {
+    max-width: 280px;
+    max-height: 280px;
+  }
+  .image-container img {
+    max-width: 280px;
+    max-height: 280px;
+    display: none;
+  }
+  .loading {
+    color: #555;
+    font-size: 1.2rem;
+  }
+  .input-area {
+    display: flex;
+    gap: 8px;
+  }
+  input[type="text"] {
+    font-size: 1.2rem;
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: 2px solid #0f3460;
+    background: #16213e;
+    color: #eee;
+    outline: none;
+    width: 220px;
+    text-align: center;
+  }
+  input[type="text"]:focus {
+    border-color: #e94560;
+  }
+  button {
+    font-size: 1rem;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    transition: transform 0.1s;
+  }
+  button:active { transform: scale(0.95); }
+  .btn-submit {
+    background: #e94560;
+    color: #fff;
+  }
+  .btn-hint {
+    background: #0f3460;
+    color: #eee;
+  }
+  .btn-next {
+    background: #00b894;
+    color: #fff;
+    font-size: 1.2rem;
+    padding: 12px 32px;
+  }
+  .btn-skip {
+    background: #636e72;
+    color: #eee;
+  }
+  .btn-back {
+    background: #636e72;
+    color: #eee;
+    font-size: 0.85rem;
+    padding: 8px 16px;
+    margin-top: 16px;
+  }
+  .result {
+    text-align: center;
+    min-height: 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .result .name-reveal {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #e94560;
+  }
+  .result .name-original {
+    font-size: 1rem;
+    color: #888;
+  }
+  .flavor-box {
+    margin-top: 4px;
+    max-width: 360px;
+    text-align: center;
+    line-height: 1.6;
+  }
+  .flavor-original {
+    font-size: 0.85rem;
+    color: #777;
+  }
+  .flavor-um {
+    font-size: 0.95rem;
+    color: #ffd32a;
+    font-weight: bold;
+  }
+  .hint-text {
+    color: #ffd32a;
+    font-size: 0.95rem;
+  }
+  .wrong {
+    animation: shake 0.4s;
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-8px); }
+    40% { transform: translateX(8px); }
+    60% { transform: translateX(-6px); }
+    80% { transform: translateX(6px); }
+  }
+  .buttons-row {
+    display: flex;
+    gap: 8px;
+  }
+  .gen-info {
+    font-size: 0.85rem;
+    color: #666;
+  }
+  .mode-select {
+    display: flex;
+    gap: 12px;
+  }
+  .mode-btn {
+    font-size: 1rem;
+    padding: 12px 24px;
+    border-radius: 12px;
+    border: 2px solid #0f3460;
+    background: #16213e;
+    color: #888;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .mode-btn.active {
+    background: #e94560;
+    border-color: #e94560;
+    color: #fff;
+  }
+</style>
+</head>
+<body>
+
+<!-- 세대 선택 화면 -->
+<div class="select-screen" id="selectScreen">
+  <h1>엄켓몬 실루엣 퀴즈</h1>
+  <h2>원하는 세대를 선택하세요</h2>
+
+  <div class="gen-grid" id="genGrid"></div>
+
+  <div class="select-actions">
+    <button class="btn-select-all" onclick="toggleAll()">전체 선택/해제</button>
+  </div>
+
+  <h2>퀴즈 모드</h2>
+  <div class="mode-select">
+    <div class="mode-btn active" data-mode="pixelate" onclick="selectMode('pixelate')">픽셀화</div>
+    <div class="mode-btn" data-mode="silhouette" onclick="selectMode('silhouette')">실루엣</div>
+  </div>
+
+  <button class="btn-start" id="startBtn" onclick="startGame()" disabled>시작하기</button>
+</div>
+
+<!-- 게임 화면 -->
+<div class="game-screen" id="gameScreen">
+  <h1>엄켓몬 퀴즈</h1>
+  <p class="score">
+    연속 정답: <span id="streak">0</span> | 최대 연속: <span id="best">0</span> | 총 정답: <span id="total">0</span>
+    <span class="gen-info" id="genInfo"></span>
+  </p>
+
+  <div class="game-area">
+    <div class="image-container" id="imageContainer">
+      <canvas id="canvas"></canvas>
+      <img id="originalImg" crossorigin="anonymous">
+      <span class="loading" id="loadingText">로딩 중...</span>
+    </div>
+
+    <div class="result" id="resultArea"></div>
+
+    <div class="input-area" id="inputArea">
+      <input type="text" id="answerInput" placeholder="엄켓몬 이름 입력" autocomplete="off">
+      <button class="btn-submit" id="submitBtn">확인</button>
+    </div>
+
+    <div class="buttons-row" id="buttonsRow">
+      <button class="btn-hint" id="hintBtn">힌트</button>
+      <button class="btn-skip" id="skipBtn">스킵</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const API_BASE = "https://pokeapi.co/api/v2";
+const ARTWORK_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork";
+
+// 세대별 포켓몬 ID 범위
+const GENERATIONS = [
+  { gen: 1, label: "1세대", sub: "관동", start: 1, end: 151 },
+  { gen: 2, label: "2세대", sub: "성도", start: 152, end: 251 },
+  { gen: 3, label: "3세대", sub: "호연", start: 252, end: 386 },
+  { gen: 4, label: "4세대", sub: "신오", start: 387, end: 493 },
+  { gen: 5, label: "5세대", sub: "하나", start: 494, end: 649 },
+  { gen: 6, label: "6세대", sub: "칼로스", start: 650, end: 721 },
+  { gen: 7, label: "7세대", sub: "알로라", start: 722, end: 809 },
+  { gen: 8, label: "8세대", sub: "가라르", start: 810, end: 905 },
+  { gen: 9, label: "9세대", sub: "팔데아", start: 906, end: 1025 },
+];
+
+let selectedGens = new Set();
+let allowedIds = [];
+let currentPokemon = null;
+let streak = 0;
+let total = 0;
+let bestStreak = 0;
+let hintUsed = false;
+let waitingNext = false;
+let preloaded = null; // { pokemon, img } 미리 로딩된 다음 문제
+let revealTimer = null;  // 점진적 실루엣 해제 타이머
+let originalPixels = null; // 원본 픽셀 데이터
+let opaqueCoords = []; // 실루엣(불투명) 픽셀 좌표 목록
+const REVEAL_INTERVAL = 3000; // 3초마다 한 단계
+const REVEAL_STEPS = 10; // 총 10단계
+let revealStep = 0;
+
+// ──────────────────────────────────────────────
+// 실루엣 모드 설정: "silhouette" | "pixelate"
+// ──────────────────────────────────────────────
+let SILHOUETTE_MODE = "pixelate";
+const PIXEL_BLOCK_START = 40; // 픽셀화 초기 블록 크기
+const PIXEL_BLOCK_END = 1;   // 최종 블록 크기 (1 = 원본)
+
+// 세대 선택 버튼 생성
+function initGenGrid() {
+  const grid = document.getElementById("genGrid");
+  for (const g of GENERATIONS) {
+    const btn = document.createElement("div");
+    btn.className = "gen-btn";
+    btn.dataset.gen = g.gen;
+    btn.innerHTML = `${g.label}<div class="gen-range">${g.sub} (#${g.start}~${g.end})</div>`;
+    btn.addEventListener("click", () => toggleGen(g.gen, btn));
+    grid.appendChild(btn);
+  }
+}
+
+function toggleGen(gen, btn) {
+  if (selectedGens.has(gen)) {
+    selectedGens.delete(gen);
+    btn.classList.remove("active");
+  } else {
+    selectedGens.add(gen);
+    btn.classList.add("active");
+  }
+  document.getElementById("startBtn").disabled = selectedGens.size === 0;
+}
+
+function toggleAll() {
+  const allSelected = selectedGens.size === GENERATIONS.length;
+  const btns = document.querySelectorAll(".gen-btn");
+  if (allSelected) {
+    selectedGens.clear();
+    btns.forEach(b => b.classList.remove("active"));
+  } else {
+    GENERATIONS.forEach(g => selectedGens.add(g.gen));
+    btns.forEach(b => b.classList.add("active"));
+  }
+  document.getElementById("startBtn").disabled = selectedGens.size === 0;
+}
+
+function selectMode(mode) {
+  SILHOUETTE_MODE = mode;
+  document.querySelectorAll(".mode-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.mode === mode);
+  });
+}
+
+// 게임 시작
+function startGame() {
+  // 선택된 세대의 ID 범위 합치기
+  allowedIds = [];
+  for (const g of GENERATIONS) {
+    if (selectedGens.has(g.gen)) {
+      for (let i = g.start; i <= g.end; i++) allowedIds.push(i);
+    }
+  }
+
+  const genLabels = GENERATIONS.filter(g => selectedGens.has(g.gen)).map(g => g.label).join(", ");
+  document.getElementById("genInfo").textContent = `| ${genLabels}`;
+
+  streak = 0;
+  total = 0;
+  bestStreak = 0;
+  document.getElementById("streak").textContent = 0;
+  document.getElementById("best").textContent = 0;
+  document.getElementById("total").textContent = 0;
+
+  document.getElementById("selectScreen").style.display = "none";
+  document.getElementById("gameScreen").style.display = "flex";
+  document.getElementById("gameScreen").style.flexDirection = "column";
+  document.getElementById("gameScreen").style.alignItems = "center";
+
+  newRound();
+}
+
+function backToSelect() {
+  document.getElementById("gameScreen").style.display = "none";
+  document.getElementById("selectScreen").style.display = "flex";
+}
+
+// 엄켓몬 이름 변환 (노 제외)
+function toUmkemon(name) {
+  const first = name[0];
+  let count = 1;
+  while (count < name.length && name[count] === first) count++;
+  return "엄".repeat(count) + name.slice(count);
+}
+
+// ── 도감 설명 엄켓몬 변환 (umkedex.py 로직) ──
+function isKorean(ch) {
+  return ch >= "\uac00" && ch <= "\ud7a3";
+}
+
+function startsWithPokemonName(word, nameSet) {
+  for (const name of nameSet) {
+    if (word.startsWith(name)) return true;
+  }
+  return false;
+}
+
+function umkemonWord(word, nameSet) {
+  if (!word || !isKorean(word[0])) return word;
+  let koreanLen = 0;
+  for (const c of word) { if (isKorean(c)) koreanLen++; }
+  if (startsWithPokemonName(word, nameSet) || koreanLen >= 4) {
+    return "엄" + word.slice(1);
+  }
+  return word;
+}
+
+function umkemonText(text, nameSet) {
+  return text.replace(/\f/g, "\n").split("\n").map(line =>
+    line.split(" ").map(w => umkemonWord(w, nameSet)).join(" ")
+  ).join(" ").trim();
+}
+
+// 포켓몬 한글 이름 캐시 (도감 설명 변환용)
+const koNameCache = new Set();
+
+// 랜덤 포켓몬 fetch
+async function fetchRandomPokemon() {
+  const id = allowedIds[Math.floor(Math.random() * allowedIds.length)];
+
+  const [speciesRes, pokemonRes] = await Promise.all([
+    fetch(`${API_BASE}/pokemon-species/${id}`).then(r => r.json()),
+    fetch(`${API_BASE}/pokemon/${id}`).then(r => r.json()),
+  ]);
+
+  let koName = null;
+  for (const entry of speciesRes.names) {
+    if (entry.language.name === "ko") {
+      koName = entry.name;
+      break;
+    }
+  }
+
+  if (!koName) return fetchRandomPokemon();
+
+  // 이름 캐시에 추가
+  koNameCache.add(koName);
+
+  // 한글 도감 설명 추출 (x 버전 우선, 없으면 최신 한글 항목)
+  let koFlavor = null;
+  for (const entry of speciesRes.flavor_text_entries) {
+    if (entry.language.name !== "ko") continue;
+    if (entry.version.name === "x") { koFlavor = entry.flavor_text; break; }
+    koFlavor = entry.flavor_text; // 최신 한글 항목으로 fallback
+  }
+
+  const types = pokemonRes.types.map(t => {
+    const typeNameMap = {
+      normal: "노말", fire: "불꽃", water: "물", electric: "전기",
+      grass: "풀", ice: "얼음", fighting: "격투", poison: "독",
+      ground: "땅", flying: "비행", psychic: "에스퍼", bug: "벌레",
+      rock: "바위", ghost: "고스트", dragon: "드래곤", dark: "악",
+      steel: "강철", fairy: "페어리",
+    };
+    return typeNameMap[t.type.name] || t.type.name;
+  });
+
+  return { id, koName, umName: toUmkemon(koName), types, koFlavor };
+}
+
+// 다음 문제 미리 로딩
+function preloadNext() {
+  preloaded = null;
+  fetchRandomPokemon().then(pokemon => {
+    const url = `${ARTWORK_BASE}/${pokemon.id}.png`;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => { preloaded = { pokemon, img }; };
+    img.onerror = () => { preloadNext(); }; // 실패 시 재시도
+    img.src = url;
+  });
+}
+
+// ── 공통: 캔버스 초기화 + 원본 저장 ──
+function initCanvas(img) {
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  ctx.drawImage(img, 0, 0);
+
+  originalPixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data.slice();
+  opaqueCoords = [];
+  for (let y = 0; y < canvas.height; y++) {
+    for (let x = 0; x < canvas.width; x++) {
+      if (originalPixels[(y * canvas.width + x) * 4 + 3] > 0) {
+        opaqueCoords.push([x, y]);
+      }
+    }
+  }
+  return { canvas, ctx };
+}
+
+// ── 모드: 검정 실루엣 ──
+const silhouetteMode = {
+  draw(img) {
+    const { canvas, ctx } = initCanvas(img);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] > 0) {
+        data[i] = 0; data[i + 1] = 0; data[i + 2] = 0; data[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(imageData, 0, 0);
+  },
+  reveal() {
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const w = canvas.width, h = canvas.height;
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const data = imageData.data;
+
+    const [cx, cy] = opaqueCoords[Math.floor(Math.random() * opaqueCoords.length)];
+    const r = Math.floor(Math.min(w, h) * 0.15);
+    for (let y = Math.max(0, cy - r); y < Math.min(h, cy + r); y++) {
+      for (let x = Math.max(0, cx - r); x < Math.min(w, cx + r); x++) {
+        if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) {
+          const i = (y * w + x) * 4;
+          if (originalPixels[i + 3] > 0) {
+            data[i] = originalPixels[i];
+            data[i+1] = originalPixels[i+1];
+            data[i+2] = originalPixels[i+2];
+            data[i+3] = 255;
+          }
+        }
+      }
+    }
+    ctx.putImageData(imageData, 0, 0);
+  }
+};
+
+// ── 모드: 픽셀화 ──
+const pixelateMode = {
+  draw(img) {
+    const { canvas, ctx } = initCanvas(img);
+    this._drawPixelated(canvas, ctx, PIXEL_BLOCK_START);
+  },
+  reveal() {
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const t = revealStep / REVEAL_STEPS;
+    const blockSize = Math.round(PIXEL_BLOCK_START * (1 - t) + PIXEL_BLOCK_END * t);
+    this._drawPixelated(canvas, ctx, Math.max(blockSize, 1));
+  },
+  _drawPixelated(canvas, ctx, blockSize) {
+    const w = canvas.width, h = canvas.height;
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const data = imageData.data;
+
+    for (let by = 0; by < h; by += blockSize) {
+      for (let bx = 0; bx < w; bx += blockSize) {
+        let r = 0, g = 0, b = 0, a = 0, count = 0;
+        for (let y = by; y < Math.min(by + blockSize, h); y++) {
+          for (let x = bx; x < Math.min(bx + blockSize, w); x++) {
+            const i = (y * w + x) * 4;
+            r += originalPixels[i]; g += originalPixels[i+1];
+            b += originalPixels[i+2]; a += originalPixels[i+3];
+            count++;
+          }
+        }
+        r = Math.round(r / count); g = Math.round(g / count);
+        b = Math.round(b / count); a = Math.round(a / count);
+        for (let y = by; y < Math.min(by + blockSize, h); y++) {
+          for (let x = bx; x < Math.min(bx + blockSize, w); x++) {
+            const i = (y * w + x) * 4;
+            data[i] = r; data[i+1] = g; data[i+2] = b; data[i+3] = a;
+          }
+        }
+      }
+    }
+    ctx.putImageData(imageData, 0, 0);
+  }
+};
+
+// ── 모드 맵 ──
+const MODES = { silhouette: silhouetteMode, pixelate: pixelateMode };
+
+function drawSilhouette(img) {
+  MODES[SILHOUETTE_MODE].draw(img);
+  revealStep = 0;
+  if (revealTimer) clearInterval(revealTimer);
+  revealTimer = setInterval(revealOneStep, REVEAL_INTERVAL);
+}
+
+function revealOneStep() {
+  revealStep++;
+  if (revealStep >= REVEAL_STEPS) {
+    clearInterval(revealTimer);
+    revealTimer = null;
+  }
+  MODES[SILHOUETTE_MODE].reveal();
+}
+
+function stopReveal() {
+  if (revealTimer) { clearInterval(revealTimer); revealTimer = null; }
+}
+
+function showOriginal() {
+  stopReveal();
+  document.getElementById("canvas").style.display = "none";
+  const img = document.getElementById("originalImg");
+  img.style.display = "block";
+}
+
+async function newRound() {
+  const loading = document.getElementById("loadingText");
+  const canvas = document.getElementById("canvas");
+  const originalImg = document.getElementById("originalImg");
+  const resultArea = document.getElementById("resultArea");
+  const inputArea = document.getElementById("inputArea");
+  const buttonsRow = document.getElementById("buttonsRow");
+  const answerInput = document.getElementById("answerInput");
+
+  stopReveal();
+  canvas.style.display = "none";
+  originalImg.style.display = "none";
+  loading.style.display = "block";
+  resultArea.innerHTML = "";
+  inputArea.style.display = "flex";
+  buttonsRow.innerHTML = `
+    <button class="btn-hint" onclick="showHint()">힌트 (Ctrl+1)</button>
+    <button class="btn-skip" onclick="skip()">스킵 (Ctrl+2)</button>
+  `;
+  answerInput.value = "";
+  answerInput.disabled = false;
+  document.getElementById("submitBtn").disabled = false;
+  hintUsed = false;
+  waitingNext = false;
+
+  if (preloaded) {
+    // 미리 로딩된 데이터 사용
+    const { pokemon, img } = preloaded;
+    preloaded = null;
+    currentPokemon = pokemon;
+    loading.style.display = "none";
+    canvas.style.display = "block";
+    drawSilhouette(img);
+    originalImg.src = `${ARTWORK_BASE}/${currentPokemon.id}.png`;
+    answerInput.focus();
+  } else {
+    // 프리로드 없으면 직접 fetch
+    currentPokemon = await fetchRandomPokemon();
+    const artworkUrl = `${ARTWORK_BASE}/${currentPokemon.id}.png`;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      loading.style.display = "none";
+      canvas.style.display = "block";
+      drawSilhouette(img);
+      originalImg.src = artworkUrl;
+      answerInput.focus();
+    };
+    img.onerror = () => newRound();
+    img.src = artworkUrl;
+  }
+}
+
+function checkAnswer() {
+  const input = document.getElementById("answerInput");
+  const answer = input.value.trim();
+  if (!answer) return;
+
+  const strip = s => s.replace(/[♂♀]/g, "");
+  if (answer === currentPokemon.umName || answer === strip(currentPokemon.umName)) {
+    streak++;
+    total++;
+    if (streak > bestStreak) {
+      bestStreak = streak;
+      document.getElementById("best").textContent = bestStreak;
+    }
+    document.getElementById("streak").textContent = streak;
+    document.getElementById("total").textContent = total;
+
+    showOriginal();
+    const flavorHtml = buildFlavorHtml();
+    document.getElementById("resultArea").innerHTML = `
+      <span class="name-reveal">${currentPokemon.umName}</span>
+      <span class="name-original">(${currentPokemon.koName})</span>
+      ${flavorHtml}
+    `;
+    document.getElementById("inputArea").style.display = "none";
+    document.getElementById("buttonsRow").innerHTML = `
+      <button class="btn-next" onclick="newRound()">다음 엄켓몬 (Enter)</button>
+    `;
+    waitingNext = true;
+    preloadNext();
+  } else {
+    input.classList.add("wrong");
+    setTimeout(() => input.classList.remove("wrong"), 400);
+  }
+}
+
+function showHint() {
+  if (!currentPokemon || hintUsed) return;
+  hintUsed = true;
+
+  const resultArea = document.getElementById("resultArea");
+  const typeStr = currentPokemon.types.join(" / ");
+  const length = currentPokemon.umName.length;
+  resultArea.innerHTML = `
+    <span class="hint-text">타입: ${typeStr}</span>
+    <span class="hint-text">글자 수: ${length}글자 | 첫 글자: ${currentPokemon.umName[0]}</span>
+  `;
+}
+
+function skip() {
+  streak = 0;
+  document.getElementById("streak").textContent = streak;
+  showOriginal();
+  const flavorHtml = buildFlavorHtml();
+  document.getElementById("resultArea").innerHTML = `
+    <span class="name-reveal">${currentPokemon.umName}</span>
+    <span class="name-original">(${currentPokemon.koName})</span>
+    ${flavorHtml}
+  `;
+  document.getElementById("inputArea").style.display = "none";
+  document.getElementById("buttonsRow").innerHTML = `
+    <button class="btn-next" onclick="newRound()">다음 엄켓몬 (Enter)</button>
+  `;
+  waitingNext = true;
+  preloadNext();
+}
+
+function buildFlavorHtml() {
+  if (!currentPokemon.koFlavor) return "";
+  const umFlavor = umkemonText(currentPokemon.koFlavor, koNameCache);
+  return `
+    <div class="flavor-box">
+      <div class="flavor-um">${umFlavor}</div>
+    </div>
+  `;
+}
+
+// 이벤트
+document.getElementById("submitBtn").addEventListener("click", checkAnswer);
+document.addEventListener("keydown", (e) => {
+  if (document.getElementById("gameScreen").style.display === "none") return;
+  if (e.key === "Enter") {
+    if (waitingNext) newRound();
+    else checkAnswer();
+  } else if (e.key === "1" && e.ctrlKey) {
+    e.preventDefault();
+    showHint();
+  } else if (e.key === "2" && e.ctrlKey) {
+    e.preventDefault();
+    skip();
+  }
+});
+
+// 초기화
+initGenGrid();
+</script>
+</body>
+</html>

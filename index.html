@@ -612,17 +612,25 @@ async function fetchRandomPokemon() {
   });
 
   const gen = GENERATIONS.find(g => id >= g.start && id <= g.end);
-  return { id, koName, umName: toUmkemon(koName), types, koFlavor, genLabel: gen ? gen.label : "" };
+  const isShiny = Math.random() < 1/128;
+  return { id, koName, umName: toUmkemon(koName), types, koFlavor, genLabel: gen ? gen.label : "", isShiny };
+}
+
+function artworkUrl(id, shiny) {
+  return shiny ? `${ARTWORK_BASE}/shiny/${id}.png` : `${ARTWORK_BASE}/${id}.png`;
 }
 
 function preloadNext() {
   preloaded = null;
   fetchRandomPokemon().then(pokemon => {
-    const url = `${ARTWORK_BASE}/${pokemon.id}.png`;
+    const url = artworkUrl(pokemon.id, pokemon.isShiny);
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => { preloaded = { pokemon, img }; };
-    img.onerror = () => { preloadNext(); };
+    img.onerror = () => {
+      if (pokemon.isShiny) { pokemon.isShiny = false; img.src = artworkUrl(pokemon.id, false); }
+      else preloadNext();
+    };
     img.src = url;
   });
 }
@@ -744,7 +752,7 @@ async function newRound() {
     currentPokemon = pokemon;
     loading.style.display = "none"; canvas.style.display = "block";
     drawSilhouette(img);
-    originalImg.src = `${ARTWORK_BASE}/${currentPokemon.id}.png`;
+    originalImg.src = artworkUrl(currentPokemon.id, currentPokemon.isShiny);
     answerInput.focus();
     if (gameMode === "ranked") startRoundTimer();
   };
@@ -752,10 +760,13 @@ async function newRound() {
   if (preloaded) { const { pokemon, img } = preloaded; preloaded = null; onReady(pokemon, img); }
   else {
     currentPokemon = await fetchRandomPokemon();
-    const url = `${ARTWORK_BASE}/${currentPokemon.id}.png`;
+    const url = artworkUrl(currentPokemon.id, currentPokemon.isShiny);
     const img = new Image(); img.crossOrigin = "anonymous";
     img.onload = () => onReady(currentPokemon, img);
-    img.onerror = () => newRound();
+    img.onerror = () => {
+      if (currentPokemon.isShiny) { currentPokemon.isShiny = false; img.src = artworkUrl(currentPokemon.id, false); }
+      else newRound();
+    };
     img.src = url;
   }
 }
@@ -777,8 +788,9 @@ function checkAnswer() {
     document.getElementById("total").textContent = total;
 
     showOriginal();
+    const shinyTag = currentPokemon.isShiny ? ' <span style="color:#ffd32a">(✨엄로치)</span>' : '';
     document.getElementById("resultArea").innerHTML = `
-      <span class="name-reveal">${currentPokemon.umName}</span>
+      <span class="name-reveal">${currentPokemon.umName}${shinyTag}</span>
       <span class="name-original">(${currentPokemon.koName} · ${currentPokemon.genLabel})</span>
       ${buildFlavorHtml()}
     `;
@@ -810,9 +822,10 @@ function skip() {
   if (gameMode === "ranked") return;
   streak = 0; document.getElementById("streak").textContent = streak;
   showOriginal();
+  const shinyTag2 = currentPokemon.isShiny ? ' <span style="color:#ffd32a">(엄로치)</span>' : '';
   document.getElementById("resultArea").innerHTML = `
-    <span class="name-reveal">${currentPokemon.umName}</span>
-    <span class="name-original">(${currentPokemon.koName})</span>
+    <span class="name-reveal">${currentPokemon.umName}${shinyTag2}</span>
+    <span class="name-original">(${currentPokemon.koName} · ${currentPokemon.genLabel})</span>
     ${buildFlavorHtml()}
   `;
   document.getElementById("inputArea").style.display = "none";
@@ -828,7 +841,7 @@ function gameOver(reason) {
   document.getElementById("goStreak").textContent = streak;
   document.getElementById("goAnswer").innerHTML = `
     <div style="color:#888; font-size:0.9rem; margin-bottom:4px">${reasonText}</div>
-    <div>정답: <span class="name-reveal">${currentPokemon.umName}</span>
+    <div>정답: <span class="name-reveal">${currentPokemon.umName}${currentPokemon.isShiny ? ' <span style="color:#ffd32a">(엄로치)</span>' : ''}</span>
     <span class="name-original">(${currentPokemon.koName} · ${currentPokemon.genLabel})</span></div>
   `;
   const goInput = document.getElementById("goNicknameInput");

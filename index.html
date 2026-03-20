@@ -611,7 +611,8 @@ async function fetchRandomPokemon() {
     return m[t.type.name] || t.type.name;
   });
 
-  return { id, koName, umName: toUmkemon(koName), types, koFlavor };
+  const gen = GENERATIONS.find(g => id >= g.start && id <= g.end);
+  return { id, koName, umName: toUmkemon(koName), types, koFlavor, genLabel: gen ? gen.label : "" };
 }
 
 function preloadNext() {
@@ -778,7 +779,7 @@ function checkAnswer() {
     showOriginal();
     document.getElementById("resultArea").innerHTML = `
       <span class="name-reveal">${currentPokemon.umName}</span>
-      <span class="name-original">(${currentPokemon.koName})</span>
+      <span class="name-original">(${currentPokemon.koName} · ${currentPokemon.genLabel})</span>
       ${buildFlavorHtml()}
     `;
     document.getElementById("inputArea").style.display = "none";
@@ -828,7 +829,7 @@ function gameOver(reason) {
   document.getElementById("goAnswer").innerHTML = `
     <div style="color:#888; font-size:0.9rem; margin-bottom:4px">${reasonText}</div>
     <div>정답: <span class="name-reveal">${currentPokemon.umName}</span>
-    <span class="name-original">(${currentPokemon.koName})</span></div>
+    <span class="name-original">(${currentPokemon.koName} · ${currentPokemon.genLabel})</span></div>
   `;
   const goInput = document.getElementById("goNicknameInput");
   goInput.value = localStorage.getItem("umkemon_nickname") || "";

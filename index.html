@@ -206,6 +206,7 @@
   .gameover-screen h1 { color: #e94560; font-size: 2.5rem; }
   .go-streak { font-size: 3rem; font-weight: bold; color: #ffd32a; }
   .go-streak-label { font-size: 1rem; color: #888; }
+  .go-image { text-align: center; margin: 8px 0; }
   .go-answer { text-align: center; }
   .go-answer .name-reveal { font-size: 1.3rem; font-weight: bold; color: #e94560; }
   .go-answer .name-original { font-size: 0.9rem; color: #888; }
@@ -347,6 +348,7 @@
   <h1>GAME OVER</h1>
   <div class="go-streak-label">연속 정답</div>
   <div class="go-streak" id="goStreak">0</div>
+  <div class="go-image"><img id="goImage" style="max-width:180px; max-height:180px; display:none;"></div>
   <div class="go-answer" id="goAnswer"></div>
   <div class="go-nickname">
     <input type="text" id="goNicknameInput" placeholder="닉네임 입력" maxlength="10">
@@ -839,6 +841,9 @@ function gameOver(reason) {
   stopRoundTimer(); stopReveal();
   const reasonText = reason === "timeout" ? "시간 초과!" : "오답!";
   document.getElementById("goStreak").textContent = streak;
+  const goImg = document.getElementById("goImage");
+  goImg.src = artworkUrl(currentPokemon.id, currentPokemon.isShiny);
+  goImg.style.display = "block";
   document.getElementById("goAnswer").innerHTML = `
     <div style="color:#888; font-size:0.9rem; margin-bottom:4px">${reasonText}</div>
     <div>정답: <span class="name-reveal">${currentPokemon.umName}${currentPokemon.isShiny ? ' <span style="color:#ffd32a">(엄로치)</span>' : ''}</span>

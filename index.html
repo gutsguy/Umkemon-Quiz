@@ -240,6 +240,31 @@
   .leaderboard .rank-2 td:first-child { color: #c0c0c0; }
   .leaderboard .rank-3 td:first-child { color: #cd7f32; }
   .lb-empty { color: #555; font-size: 0.9rem; text-align: center; padding: 16px; }
+
+  /* 히든 모달 */
+  .secret-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7); z-index: 999;
+    justify-content: center; align-items: center;
+  }
+  .secret-overlay.active { display: flex; }
+  .secret-box {
+    background: #16213e; border-radius: 16px; padding: 24px 32px;
+    text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px;
+  }
+  .secret-box p { color: #ccc; font-size: 0.95rem; margin: 0; }
+  .secret-box input {
+    width: 80px; height: 60px; font-size: 2rem; text-align: center;
+    background: #0f3460; color: #fff; border: 2px solid #555; border-radius: 12px;
+  }
+  .secret-box input:focus { border-color: #e94560; outline: none; }
+  .secret-box .secret-btns { display: flex; gap: 8px; }
+  .secret-box button {
+    padding: 8px 20px; border-radius: 8px; font-size: 0.9rem; cursor: pointer; border: none;
+  }
+  .secret-box .btn-ok { background: #e94560; color: #fff; }
+  .secret-box .btn-reset { background: #555; color: #fff; }
+  .secret-box .btn-cancel { background: #333; color: #888; }
 </style>
 </head>
 <body>
@@ -247,7 +272,7 @@
 <!-- 1. 메인 화면 -->
 <div class="screen active" id="mainScreen">
   <div class="main-hero">
-    <h1>엄켓몬 실루엣 퀴즈</h1>
+    <h1 id="mainTitle" style="cursor:default; user-select:none;">엄켓몬 실루엣 퀴즈</h1>
     <p class="main-sub">게임 모드를 선택하세요</p>
   </div>
 
@@ -313,7 +338,7 @@
 <!-- 3. 게임 화면 -->
 <div class="screen" id="gameScreen">
   <span class="mode-badge" id="modeBadge"></span>
-  <h1>엄켓몬 퀴즈</h1>
+  <h1 id="gameTitle">엄켓몬 퀴즈</h1>
   <p class="score">
     연속 정답: <span id="streak">0</span> | 최대 연속: <span id="best">0</span> | 총 정답: <span id="total">0</span>
     <span class="gen-info" id="genInfo"></span>
@@ -357,6 +382,19 @@
   <button class="btn-back" onclick="goToMain()">메뉴로 돌아가기</button>
 </div>
 
+<!-- 히든 모달 -->
+<div class="secret-overlay" id="secretOverlay">
+  <div class="secret-box">
+    <p>접두사를 입력하세요 (한 글자)</p>
+    <input type="text" id="secretInput" maxlength="1">
+    <div class="secret-btns">
+      <button class="btn-ok" onclick="applyPrefix()">적용</button>
+      <button class="btn-reset" onclick="resetPrefix()">초기화</button>
+      <button class="btn-cancel" onclick="closeSecret()">취소</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const API_BASE = "https://pokeapi.co/api/v2";
 const ARTWORK_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork";
@@ -384,6 +422,7 @@ const REVEAL_INTERVAL = 3000, REVEAL_STEPS = 10;
 let revealStep = 0;
 
 let SILHOUETTE_MODE = "pixelate";
+let PREFIX = "엄";
 const PIXEL_BLOCK_START = 40, PIXEL_BLOCK_END = 1;
 
 let gameMode = "practice";
@@ -554,7 +593,7 @@ function toUmkemon(name) {
   const first = name[0];
   let count = 1;
   while (count < name.length && name[count] === first) count++;
-  return "엄".repeat(count) + name.slice(count);
+  return PREFIX.repeat(count) + name.slice(count);
 }
 
 function isKorean(ch) { return ch >= "\uac00" && ch <= "\ud7a3"; }
@@ -568,7 +607,7 @@ function umkemonWord(word, nameSet) {
   if (!word || !isKorean(word[0])) return word;
   let koreanLen = 0;
   for (const c of word) { if (isKorean(c)) koreanLen++; }
-  if (startsWithPokemonName(word, nameSet) || koreanLen >= 4) return "엄" + word.slice(1);
+  if (startsWithPokemonName(word, nameSet) || koreanLen >= 4) return PREFIX + word.slice(1);
   return word;
 }
 
@@ -790,7 +829,7 @@ function checkAnswer() {
     document.getElementById("total").textContent = total;
 
     showOriginal();
-    const shinyTag = currentPokemon.isShiny ? ' <span style="color:#ffd32a">(✨엄로치)</span>' : '';
+    const shinyTag = currentPokemon.isShiny ? ` <span style="color:#ffd32a">(✨${PREFIX}로치)</span>` : '';
     document.getElementById("resultArea").innerHTML = `
       <span class="name-reveal">${currentPokemon.umName}${shinyTag}</span>
       <span class="name-original">(${currentPokemon.koName} · ${currentPokemon.genLabel})</span>
@@ -798,7 +837,7 @@ function checkAnswer() {
     `;
     document.getElementById("inputArea").style.display = "none";
     document.getElementById("buttonsRow").innerHTML = `
-      <button class="btn-next" onclick="newRound()">다음 엄켓몬 (Enter)</button>
+      <button class="btn-next" onclick="newRound()">다음 ${PREFIX}켓몬 (Enter)</button>
     `;
     waitingNext = true; preloadNext();
   } else {
@@ -824,7 +863,7 @@ function skip() {
   if (gameMode === "ranked") return;
   streak = 0; document.getElementById("streak").textContent = streak;
   showOriginal();
-  const shinyTag2 = currentPokemon.isShiny ? ' <span style="color:#ffd32a">(엄로치)</span>' : '';
+  const shinyTag2 = currentPokemon.isShiny ? ` <span style="color:#ffd32a">(${PREFIX}로치)</span>` : '';
   document.getElementById("resultArea").innerHTML = `
     <span class="name-reveal">${currentPokemon.umName}${shinyTag2}</span>
     <span class="name-original">(${currentPokemon.koName} · ${currentPokemon.genLabel})</span>
@@ -832,7 +871,7 @@ function skip() {
   `;
   document.getElementById("inputArea").style.display = "none";
   document.getElementById("buttonsRow").innerHTML = `
-    <button class="btn-next" onclick="newRound()">다음 엄켓몬 (Enter)</button>
+    <button class="btn-next" onclick="newRound()">다음 ${PREFIX}켓몬 (Enter)</button>
   `;
   waitingNext = true; preloadNext();
 }
@@ -846,7 +885,7 @@ function gameOver(reason) {
   goImg.style.display = "block";
   document.getElementById("goAnswer").innerHTML = `
     <div style="color:#888; font-size:0.9rem; margin-bottom:4px">${reasonText}</div>
-    <div>정답: <span class="name-reveal">${currentPokemon.umName}${currentPokemon.isShiny ? ' <span style="color:#ffd32a">(엄로치)</span>' : ''}</span>
+    <div>정답: <span class="name-reveal">${currentPokemon.umName}${currentPokemon.isShiny ? ` <span style="color:#ffd32a">(${PREFIX}로치)</span>` : ''}</span>
     <span class="name-original">(${currentPokemon.koName} · ${currentPokemon.genLabel})</span></div>
   `;
   const goInput = document.getElementById("goNicknameInput");
@@ -872,6 +911,49 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Enter") { if (waitingNext) newRound(); else checkAnswer(); }
   else if (e.key === "1" && e.ctrlKey && gameMode === "practice") { e.preventDefault(); showHint(); }
   else if (e.key === "2" && e.ctrlKey && gameMode === "practice") { e.preventDefault(); skip(); }
+});
+
+// ── 히든 접두사 변경 ──
+let titleClicks = 0, titleClickTimer = null;
+document.getElementById("mainTitle").addEventListener("click", () => {
+  titleClicks++;
+  clearTimeout(titleClickTimer);
+  titleClickTimer = setTimeout(() => titleClicks = 0, 3000);
+  if (titleClicks >= 10) {
+    titleClicks = 0;
+    document.getElementById("secretInput").value = PREFIX === "엄" ? "" : PREFIX;
+    document.getElementById("secretOverlay").classList.add("active");
+    document.getElementById("secretInput").focus();
+  }
+});
+
+function applyPrefix() {
+  const v = document.getElementById("secretInput").value.trim();
+  if (v.length === 1) {
+    PREFIX = v;
+    updatePrefixUI();
+    closeSecret();
+  }
+}
+function resetPrefix() {
+  PREFIX = "엄";
+  updatePrefixUI();
+  closeSecret();
+}
+function closeSecret() {
+  document.getElementById("secretOverlay").classList.remove("active");
+}
+function updatePrefixUI() {
+  const name = PREFIX + "켓몬";
+  document.title = name + " 실루엣 퀴즈";
+  document.getElementById("mainTitle").textContent = name + " 실루엣 퀴즈";
+  document.getElementById("gameTitle").textContent = name + " 퀴즈";
+  document.getElementById("answerInput").placeholder = name + " 이름 입력";
+}
+
+document.getElementById("secretInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") applyPrefix();
+  if (e.key === "Escape") closeSecret();
 });
 
 initGenGrid();

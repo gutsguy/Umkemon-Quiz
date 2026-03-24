@@ -790,6 +790,7 @@ async function newRound() {
   } else { buttonsRow.innerHTML = ""; }
 
   const onReady = (pokemon, img) => {
+    pokemon.umName = toUmkemon(pokemon.koName);
     currentPokemon = pokemon;
     loading.style.display = "none"; canvas.style.display = "block";
     drawSilhouette(img);
@@ -992,6 +993,7 @@ function saveScore(nickname, streakVal) {
     name: nickname,
     streak: streakVal,
     quizMode: SILHOUETTE_MODE,
+    failedPokemon: currentPokemon ? currentPokemon.koName : "",
     ts: Date.now()
   });
 }
@@ -1034,12 +1036,13 @@ function loadLeaderboard() {
     }
 
     const myName = localStorage.getItem("umkemon_nickname") || "";
-    let html = '<table><tr><th>#</th><th>닉네임</th><th>연속 정답</th></tr>';
+    let html = '<table><tr><th>#</th><th>닉네임</th><th>연속 정답</th><th>패배</th></tr>';
     entries.forEach((e, i) => {
       const rankClass = i < 3 ? ` rank-${i+1}` : "";
       const meClass = e.name === myName ? " me" : "";
       const medal = ["🥇","🥈","🥉"][i] || (i+1);
-      html += `<tr class="${rankClass}${meClass}"><td>${medal}</td><td>${e.name}</td><td>${e.streak}</td></tr>`;
+      const failed = e.failedPokemon || "-";
+      html += `<tr class="${rankClass}${meClass}"><td>${medal}</td><td>${e.name}</td><td>${e.streak}</td><td>${failed}</td></tr>`;
     });
     html += '</table>';
     container.innerHTML = html;

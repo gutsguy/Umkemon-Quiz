@@ -909,7 +909,7 @@ document.addEventListener("keydown", (e) => {
     return;
   }
   if (!document.getElementById("gameScreen").classList.contains("active")) return;
-  if (e.key === "Enter") { if (waitingNext) newRound(); else checkAnswer(); }
+  if (e.key === "Enter" && !e.isComposing) { if (waitingNext) newRound(); else checkAnswer(); }
   else if (e.key === "1" && e.ctrlKey && gameMode === "practice") { e.preventDefault(); showHint(); }
   else if (e.key === "2" && e.ctrlKey && gameMode === "practice") { e.preventDefault(); skip(); }
 });

@@ -12697,8 +12697,8 @@ const POKEMON_DB_RAW = [
   {
     "id": 10190,
     "koName": "무한다이노",
-    "formType": "form",
-    "formLabel": "무한",
+    "formType": "eternamax",
+    "formLabel": "",
     "types": [
       "독",
       "드래곤"

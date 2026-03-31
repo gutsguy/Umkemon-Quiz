@@ -40,6 +40,15 @@
     margin-top: 16px; width: 100%; max-width: 420px;
   }
   .main-leaderboard h2 { font-size: 1.2rem; color: #aaa; }
+  .main-rules {
+    width: 100%; max-width: 420px; margin-top: 20px;
+    text-align: left; color: #bbb; font-size: 0.85rem;
+  }
+  .main-rules h2 { font-size: 1.2rem; color: #aaa; text-align: center; margin-bottom: 12px; }
+  .main-rules .rule-group { margin-bottom: 12px; }
+  .main-rules .rule-title { color: #e94560; font-weight: bold; font-size: 0.9rem; margin-bottom: 4px; }
+  .main-rules .rule-ex { color: #888; font-size: 0.8rem; padding-left: 8px; }
+  .main-rules .rule-ex span { color: #ffd32a; }
   .btn-mode {
     font-size: 1.3rem;
     padding: 20px 40px;
@@ -179,8 +188,8 @@
     display: flex; flex-direction: column;
     align-items: center; gap: 8px;
   }
-  .result .name-reveal { font-size: 1.5rem; font-weight: bold; color: #e94560; }
-  .result .name-original { font-size: 1rem; color: #888; }
+  .result .name-reveal { font-size: 1.5rem; font-weight: bold; color: #e94560; display: block; }
+  .result .name-original { font-size: 1rem; color: #888; display: block; }
   .flavor-box { margin-top: 4px; max-width: 360px; text-align: center; line-height: 1.6; }
   .flavor-um { font-size: 0.95rem; color: #ffd32a; font-weight: bold; }
   .hint-text { color: #ffd32a; font-size: 0.95rem; }
@@ -283,8 +292,38 @@
     </button>
     <button class="btn-mode ranked" onclick="goToRankedSettings()">
       랭크모드
-      <div class="mode-desc">전 세대 / 15초 제한 / 1틀 게임오버</div>
+      <div class="mode-desc">전 세대 / 20초 제한 / 1틀 게임오버</div>
     </button>
+  </div>
+
+  <div class="main-rules">
+    <h2>엄켓몬 규칙</h2>
+    <div class="rule-group">
+      <div class="rule-title">1. 기본 — 첫 글자를 "엄"으로 교체 (연속 반복 시 모두 교체)</div>
+      <div class="rule-ex">피카츄 → <span>엄카츄</span> · 기기어르 → <span>엄엄어르</span></div>
+    </div>
+    <div class="rule-group">
+      <div class="rule-title">2. 메가진화 — "메가" + 엄켓몬 이름</div>
+      <div class="rule-ex">메가리자몽X → <span>메가엄자몽X</span> · 메가루카리오 → <span>메가엄카리오</span></div>
+    </div>
+    <div class="rule-group">
+      <div class="rule-title">3. 거다이맥스 — "엄다이맥스" + 엄켓몬 이름</div>
+      <div class="rule-ex">거다이맥스 피카츄 → <span>엄다이맥스 엄카츄</span></div>
+    </div>
+    <div class="rule-group">
+      <div class="rule-title">4. 원시회귀 — "원시" + 엄켓몬 이름</div>
+      <div class="rule-ex">원시가이오가 → <span>원시엄이오가</span> · 원시그란돈 → <span>원시엄란돈</span></div>
+    </div>
+    <div class="rule-group">
+      <div class="rule-title">5. 리전폼 / 폼체인지 — 기본과 동일</div>
+      <div class="rule-ex">알로라 라이츄 → <span>엄이츄</span> · 기라티나(오리진) → <span>엄라티나</span></div>
+    </div>
+    <div class="rule-group" style="color:#666; font-size:0.78rem;">
+      * 메가 / 거다이맥스 / 원시는 띄어쓰기 있어도 없어도 정답
+    </div>
+    <div class="rule-group" style="color:#666; font-size:0.78rem;">
+      * 영어 대소문자 구분 없음
+    </div>
   </div>
 
   <div class="main-leaderboard">
@@ -428,7 +467,7 @@ let PREFIX = "엄";
 const PIXEL_BLOCK_START = 40, PIXEL_BLOCK_END = 1;
 
 let gameMode = "practice";
-const RANKED_TIME = 15;
+const RANKED_TIME = 20;
 let roundTimerInterval = null, timeLeft = RANKED_TIME;
 
 let currentLbTab = "pixelate";
@@ -818,10 +857,9 @@ function checkAnswer() {
   if (!answer) return;
 
   const strip = s => s.replace(/[♂♀]/g, "");
-  const normalize = s => s.replace(/\s/g, "");
-  const isCorrect = answer === currentPokemon.umName
-    || answer === strip(currentPokemon.umName)
-    || normalize(answer) === normalize(currentPokemon.umName);
+  const normalize = s => s.replace(/\s/g, "").toLowerCase();
+  const isCorrect = normalize(answer) === normalize(currentPokemon.umName)
+    || normalize(answer) === normalize(strip(currentPokemon.umName));
 
   if (isCorrect) {
     stopRoundTimer(); streak++; total++;
@@ -886,8 +924,8 @@ function gameOver(reason) {
   goImg.style.display = "block";
   document.getElementById("goAnswer").innerHTML = `
     <div style="color:#888; font-size:0.9rem; margin-bottom:4px">${reasonText}</div>
-    <div>정답: <span class="name-reveal">${currentPokemon.umName}${currentPokemon.isShiny ? ` <span style="color:#ffd32a">(${PREFIX}로치)</span>` : ''}</span>
-    <span class="name-original">${currentPokemon.displayName} · ${currentPokemon.genLabel}</span></div>
+    <div>정답: <span class="name-reveal">${currentPokemon.umName}${currentPokemon.isShiny ? ` <span style="color:#ffd32a">(${PREFIX}로치)</span>` : ''}</span></div>
+    <div><span class="name-original">${currentPokemon.displayName} · ${currentPokemon.genLabel}</span></div>
   `;
   const goInput = document.getElementById("goNicknameInput");
   goInput.value = localStorage.getItem("umkemon_nickname") || "";

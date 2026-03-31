@@ -395,8 +395,8 @@
   </div>
 </div>
 
+<script src="pokemon_data.js"></script>
 <script>
-const API_BASE = "https://pokeapi.co/api/v2";
 const ARTWORK_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork";
 
 const GENERATIONS = [
@@ -411,8 +411,10 @@ const GENERATIONS = [
   { gen: 9, label: "9세대", sub: "팔데아", start: 906, end: 1025 },
 ];
 
+const REGION_LABELS = { alola: "알로라", galar: "가라르", hisui: "히스이", paldea: "팔데아" };
+let POKEMON_DB = [];
 let selectedGens = new Set();
-let allowedIds = [];
+let allowedPool = [];
 let currentPokemon = null;
 let streak = 0, total = 0, bestStreak = 0;
 let hintUsed = false, waitingNext = false;
@@ -459,10 +461,7 @@ function selectRankedQuizMode(mode) {
 
 function startRankedGame() {
   // 전 세대 자동 포함
-  allowedIds = [];
-  for (const g of GENERATIONS) {
-    for (let i = g.start; i <= g.end; i++) allowedIds.push(i);
-  }
+  allowedPool = POKEMON_DB.slice();
 
   document.getElementById("genInfo").textContent = "| 전 세대";
 
@@ -560,12 +559,7 @@ function hideTimer() {
 
 // ── 게임 시작 ──
 function startGame() {
-  allowedIds = [];
-  for (const g of GENERATIONS) {
-    if (selectedGens.has(g.gen)) {
-      for (let i = g.start; i <= g.end; i++) allowedIds.push(i);
-    }
-  }
+  allowedPool = POKEMON_DB.filter(p => selectedGens.has(p.gen));
 
   const genLabels = GENERATIONS.filter(g => selectedGens.has(g.gen)).map(g => g.label).join(", ");
   document.getElementById("genInfo").textContent = `| ${genLabels}`;
@@ -619,42 +613,43 @@ function umkemonText(text, nameSet) {
 
 const koNameCache = new Set();
 
-async function fetchRandomPokemon() {
-  const id = allowedIds[Math.floor(Math.random() * allowedIds.length)];
-  const [speciesRes, pokemonRes] = await Promise.all([
-    fetch(`${API_BASE}/pokemon-species/${id}`).then(r => r.json()),
-    fetch(`${API_BASE}/pokemon/${id}`).then(r => r.json()),
-  ]);
-
-  let koName = null;
-  for (const entry of speciesRes.names) {
-    if (entry.language.name === "ko") { koName = entry.name; break; }
+function computeNames(p) {
+  const um = toUmkemon(p.koName);
+  let umName, displayName;
+  switch (p.formType) {
+    case "mega":
+      umName = "메가" + um + p.formLabel;
+      displayName = "메가" + p.koName + p.formLabel;
+      break;
+    case "gmax":
+      umName = PREFIX + "다이맥스 " + um;
+      displayName = "거다이맥스 " + p.koName;
+      break;
+    case "primal":
+      umName = "원시" + um;
+      displayName = "원시" + p.koName;
+      break;
+    case "alola": case "galar": case "hisui": case "paldea":
+      umName = um;
+      displayName = p.koName + " (" + REGION_LABELS[p.formType] + ")";
+      break;
+    case "form":
+      umName = um;
+      displayName = p.koName + " (" + p.formLabel + ")";
+      break;
+    default:
+      umName = um;
+      displayName = p.koName;
   }
-  if (!koName) return fetchRandomPokemon();
+  const genObj = GENERATIONS.find(g => g.gen === p.gen);
+  return { umName, displayName, genLabel: genObj ? genObj.label : "" };
+}
 
-  koNameCache.add(koName);
-
-  let koFlavor = null;
-  for (const entry of speciesRes.flavor_text_entries) {
-    if (entry.language.name !== "ko") continue;
-    if (entry.version.name === "x") { koFlavor = entry.flavor_text; break; }
-    koFlavor = entry.flavor_text;
-  }
-
-  const types = pokemonRes.types.map(t => {
-    const m = {
-      normal:"노말", fire:"불꽃", water:"물", electric:"전기",
-      grass:"풀", ice:"얼음", fighting:"격투", poison:"독",
-      ground:"땅", flying:"비행", psychic:"에스퍼", bug:"벌레",
-      rock:"바위", ghost:"고스트", dragon:"드래곤", dark:"악",
-      steel:"강철", fairy:"페어리",
-    };
-    return m[t.type.name] || t.type.name;
-  });
-
-  const gen = GENERATIONS.find(g => id >= g.start && id <= g.end);
+function getRandomPokemon() {
+  const p = allowedPool[Math.floor(Math.random() * allowedPool.length)];
+  const { umName, displayName, genLabel } = computeNames(p);
   const isShiny = Math.random() < 1/128;
-  return { id, koName, umName: toUmkemon(koName), types, koFlavor, genLabel: gen ? gen.label : "", isShiny };
+  return { ...p, umName, displayName, genLabel, isShiny };
 }
 
 function artworkUrl(id, shiny) {
@@ -663,17 +658,16 @@ function artworkUrl(id, shiny) {
 
 function preloadNext() {
   preloaded = null;
-  fetchRandomPokemon().then(pokemon => {
-    const url = artworkUrl(pokemon.id, pokemon.isShiny);
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => { preloaded = { pokemon, img }; };
-    img.onerror = () => {
-      if (pokemon.isShiny) { pokemon.isShiny = false; img.src = artworkUrl(pokemon.id, false); }
-      else preloadNext();
-    };
-    img.src = url;
-  });
+  const pokemon = getRandomPokemon();
+  const url = artworkUrl(pokemon.id, pokemon.isShiny);
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.onload = () => { preloaded = { pokemon, img }; };
+  img.onerror = () => {
+    if (pokemon.isShiny) { pokemon.isShiny = false; img.src = artworkUrl(pokemon.id, false); }
+    else preloadNext();
+  };
+  img.src = url;
 }
 
 // ── 캔버스 / 실루엣 / 픽셀화 ──
@@ -765,7 +759,7 @@ function showOriginal() {
 }
 
 // ── 라운드 ──
-async function newRound() {
+function newRound() {
   const loading = document.getElementById("loadingText");
   const canvas = document.getElementById("canvas");
   const originalImg = document.getElementById("originalImg");
@@ -790,7 +784,10 @@ async function newRound() {
   } else { buttonsRow.innerHTML = ""; }
 
   const onReady = (pokemon, img) => {
-    pokemon.umName = toUmkemon(pokemon.koName);
+    const names = computeNames(pokemon);
+    pokemon.umName = names.umName;
+    pokemon.displayName = names.displayName;
+    pokemon.genLabel = names.genLabel;
     currentPokemon = pokemon;
     loading.style.display = "none"; canvas.style.display = "block";
     drawSilhouette(img);
@@ -801,12 +798,12 @@ async function newRound() {
 
   if (preloaded) { const { pokemon, img } = preloaded; preloaded = null; onReady(pokemon, img); }
   else {
-    currentPokemon = await fetchRandomPokemon();
-    const url = artworkUrl(currentPokemon.id, currentPokemon.isShiny);
+    const pokemon = getRandomPokemon();
+    const url = artworkUrl(pokemon.id, pokemon.isShiny);
     const img = new Image(); img.crossOrigin = "anonymous";
-    img.onload = () => onReady(currentPokemon, img);
+    img.onload = () => onReady(pokemon, img);
     img.onerror = () => {
-      if (currentPokemon.isShiny) { currentPokemon.isShiny = false; img.src = artworkUrl(currentPokemon.id, false); }
+      if (pokemon.isShiny) { pokemon.isShiny = false; img.src = artworkUrl(pokemon.id, false); }
       else newRound();
     };
     img.src = url;
@@ -821,7 +818,10 @@ function checkAnswer() {
   if (!answer) return;
 
   const strip = s => s.replace(/[♂♀]/g, "");
-  const isCorrect = answer === currentPokemon.umName || answer === strip(currentPokemon.umName);
+  const normalize = s => s.replace(/\s/g, "");
+  const isCorrect = answer === currentPokemon.umName
+    || answer === strip(currentPokemon.umName)
+    || normalize(answer) === normalize(currentPokemon.umName);
 
   if (isCorrect) {
     stopRoundTimer(); streak++; total++;
@@ -833,7 +833,7 @@ function checkAnswer() {
     const shinyTag = currentPokemon.isShiny ? ` <span style="color:#ffd32a">(✨${PREFIX}로치)</span>` : '';
     document.getElementById("resultArea").innerHTML = `
       <span class="name-reveal">${currentPokemon.umName}${shinyTag}</span>
-      <span class="name-original">(${currentPokemon.koName} · ${currentPokemon.genLabel})</span>
+      <span class="name-original">${currentPokemon.displayName} · ${currentPokemon.genLabel}</span>
       ${buildFlavorHtml()}
     `;
     document.getElementById("inputArea").style.display = "none";
@@ -867,7 +867,7 @@ function skip() {
   const shinyTag2 = currentPokemon.isShiny ? ` <span style="color:#ffd32a">(${PREFIX}로치)</span>` : '';
   document.getElementById("resultArea").innerHTML = `
     <span class="name-reveal">${currentPokemon.umName}${shinyTag2}</span>
-    <span class="name-original">(${currentPokemon.koName} · ${currentPokemon.genLabel})</span>
+    <span class="name-original">${currentPokemon.displayName} · ${currentPokemon.genLabel}</span>
     ${buildFlavorHtml()}
   `;
   document.getElementById("inputArea").style.display = "none";
@@ -887,7 +887,7 @@ function gameOver(reason) {
   document.getElementById("goAnswer").innerHTML = `
     <div style="color:#888; font-size:0.9rem; margin-bottom:4px">${reasonText}</div>
     <div>정답: <span class="name-reveal">${currentPokemon.umName}${currentPokemon.isShiny ? ` <span style="color:#ffd32a">(${PREFIX}로치)</span>` : ''}</span>
-    <span class="name-original">(${currentPokemon.koName} · ${currentPokemon.genLabel})</span></div>
+    <span class="name-original">${currentPokemon.displayName} · ${currentPokemon.genLabel}</span></div>
   `;
   const goInput = document.getElementById("goNicknameInput");
   goInput.value = localStorage.getItem("umkemon_nickname") || "";
@@ -957,6 +957,9 @@ document.getElementById("secretInput").addEventListener("keydown", (e) => {
   if (e.key === "Escape") closeSecret();
 });
 
+// ── 데이터 로드 ──
+POKEMON_DB = POKEMON_DB_RAW;
+POKEMON_DB.forEach(p => koNameCache.add(p.koName));
 initGenGrid();
 </script>
 
@@ -993,7 +996,7 @@ function saveScore(nickname, streakVal) {
     name: nickname,
     streak: streakVal,
     quizMode: SILHOUETTE_MODE,
-    failedPokemon: currentPokemon ? currentPokemon.koName : "",
+    failedPokemon: currentPokemon ? currentPokemon.displayName : "",
     ts: Date.now()
   });
 }

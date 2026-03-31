@@ -220,6 +220,11 @@
   .go-answer .name-reveal { font-size: 1.3rem; font-weight: bold; color: #e94560; }
   .go-answer .name-original { font-size: 0.9rem; color: #888; }
   .go-nickname { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .go-buttons { display: flex; gap: 8px; }
+  .btn-retry {
+    background: #e94560; color: #fff;
+    font-size: 1.1rem; padding: 12px 32px; border-radius: 12px;
+  }
   .go-nickname input {
     font-size: 1.1rem; padding: 10px 16px;
     border-radius: 8px; border: 2px solid #0f3460;
@@ -416,7 +421,10 @@
   <div class="go-answer" id="goAnswer"></div>
   <div class="go-nickname">
     <input type="text" id="goNicknameInput" placeholder="닉네임 입력" maxlength="10">
-    <button class="btn-save-score" id="goSaveBtn" onclick="saveAndReturn()">기록 저장</button>
+    <div class="go-buttons">
+      <button class="btn-save-score" id="goSaveBtn" onclick="saveAndReturn()">기록 저장</button>
+      <button class="btn-retry" id="goRetryBtn" onclick="retryRanked()">다시하기</button>
+    </div>
   </div>
   <button class="btn-back" onclick="goToMain()">메뉴로 돌아가기</button>
 </div>
@@ -929,8 +937,11 @@ function gameOver(reason) {
   `;
   const goInput = document.getElementById("goNicknameInput");
   goInput.value = localStorage.getItem("umkemon_nickname") || "";
+  goInput.style.display = "";
   document.getElementById("goSaveBtn").disabled = false;
   document.getElementById("goSaveBtn").textContent = "기록 저장";
+  document.getElementById("goSaveBtn").style.display = "";
+  document.getElementById("goRetryBtn").style.display = "";
   showScreen("gameoverScreen");
 }
 
@@ -943,7 +954,11 @@ function buildFlavorHtml() {
 document.getElementById("submitBtn").addEventListener("click", checkAnswer);
 document.addEventListener("keydown", (e) => {
   if (document.getElementById("gameoverScreen").classList.contains("active")) {
-    if (e.key === "Enter") saveAndReturn();
+    if (e.key === "Enter") {
+      const saveBtn = document.getElementById("goSaveBtn");
+      if (saveBtn.style.display === "none") retryRanked();
+      else saveAndReturn();
+    }
     return;
   }
   if (!document.getElementById("gameScreen").classList.contains("active")) return;
@@ -1047,13 +1062,18 @@ function saveAndReturn() {
   btn.disabled = true; btn.textContent = "저장 중...";
   saveScore(nickname, streak).then(() => {
     btn.textContent = "저장 완료!";
-    setTimeout(() => goToMain(), 800);
+    btn.style.display = "none";
+    document.getElementById("goNicknameInput").style.display = "none";
   }).catch(err => {
     console.error("점수 저장 실패:", err);
     btn.textContent = "저장 실패!";
     btn.disabled = false;
     alert("저장 실패: " + err.message + "\nFirebase 규칙을 확인하세요.");
   });
+}
+
+function retryRanked() {
+  startRankedGame();
 }
 
 // ── 리더보드 로드 (퀴즈 모드별 필터) ──

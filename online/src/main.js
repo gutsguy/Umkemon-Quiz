@@ -69,6 +69,8 @@ let usedQuestionIds = new Set();
 let timeSyncReady = false;
 let authUser = null;
 let revealRenderer = null;
+let relayReady = false;
+let timeSyncStarted = false;
 
 initGenerationGrid(selectedGenerations);
 initSegmentedControl('#mode-select', 'mode', (mode) => {
@@ -200,6 +202,7 @@ function bindPlayers(hostId) {
     remotePlayer = players.find((player) => player.id !== localPlayer.id) || remotePlayer;
     renderPlayers(players, hostId);
     renderScoreboard(players, scores);
+    setupRelayTransportIfReady();
     updateStartButton();
   });
 }
@@ -217,26 +220,22 @@ function bindRoomLifecycle() {
 function bindPeerEvents() {
   peerSession.addEventListener('open', () => {
     setStatus(['DataChannel 연결 완료.', '시간 보정을 준비 중입니다.']);
-    peerSession.send({
+    sendToPeer({
       type: MessageType.Hello,
       player: localPlayer,
     });
-
-    if (role === 'host') {
-      hostTimeSync = new HostTimeSync((message) => peerSession.send(message));
-    } else {
-      clientTimeSync = new ClientTimeSync((message) => peerSession.send(message));
-      clientTimeSync.addEventListener('done', (event) => {
-        clientOffsetToHost = event.detail.offsetToHost;
-        setLatencyInfo(event.detail);
-        setStatus(['시간 보정 완료.', '방장이 게임을 시작할 때까지 기다리세요.']);
-      });
-      clientTimeSync.start();
-    }
+    startTimeSyncIfReady();
   });
 
   peerSession.addEventListener('statechange', (event) => {
     setStatus([`연결 상태: ${event.detail}`]);
+    if (event.detail === 'failed' || event.detail === 'disconnected') {
+      setupRelayTransportIfReady();
+      if (relayReady) {
+        setStatus(['P2P 직접 연결 실패. Firebase relay로 전환합니다.']);
+        startTimeSyncIfReady();
+      }
+    }
   });
 
   peerSession.addEventListener('candidatepublisherror', (event) => {
@@ -298,12 +297,12 @@ function handlePeerMessage(message) {
 }
 
 function startGameAsHost() {
-  if (role !== 'host' || !peerSession?.isOpen || !timeSyncReady || players.length < 2) return;
+  if (role !== 'host' || !canSendToPeer() || !timeSyncReady || players.length < 2) return;
   scores = Object.fromEntries(players.map((player) => [player.id, 0]));
   usedQuestionIds = new Set();
   showScreen('game-screen');
   renderScoreboard(players, scores);
-  peerSession.send({
+  sendToPeer({
     type: MessageType.StartGame,
     settings,
     scores,
@@ -328,7 +327,7 @@ function nextQuestionAsHost() {
     timeoutAt: Date.now() + QUESTION_DELAY_MS + ROUND_SECONDS * 1000,
   };
 
-  peerSession.send({ type: MessageType.Question, question });
+  sendToPeer({ type: MessageType.Question, question });
   receiveQuestion(question);
 }
 
@@ -388,7 +387,7 @@ function submitAnswer(event) {
   if (role === 'host') {
     handleAnswerAsHost(message);
   } else {
-    peerSession.send(message);
+    sendToPeer(message);
   }
 }
 
@@ -417,7 +416,7 @@ function handleAnswerAsHost(message) {
     correct,
   };
   appendChatMessage(chat);
-  peerSession.send(chat);
+  sendToPeer(chat);
 
   if (!correct) return;
 
@@ -458,7 +457,7 @@ function finalizeRound(winner) {
   };
 
   applyRoundResult(result);
-  peerSession.send(result);
+  sendToPeer(result);
 
   if (winner && scores[winner.playerId] >= settings.targetScore) {
     const gameOver = {
@@ -468,7 +467,7 @@ function finalizeRound(winner) {
     };
     window.setTimeout(() => {
       applyGameOver(gameOver);
-      peerSession.send(gameOver);
+      sendToPeer(gameOver);
     }, 2500);
   } else {
     window.setTimeout(nextQuestionAsHost, 3200);
@@ -501,9 +500,9 @@ function applyGameOver(message) {
 function updateStartButton() {
   const startBtn = document.querySelector('#start-game-btn');
   if (role !== 'host') return;
-  const canStart = Boolean(peerSession?.isOpen && timeSyncReady && players.length >= 2);
+  const canStart = Boolean(canSendToPeer() && timeSyncReady && players.length >= 2);
   startBtn.disabled = !canStart;
-  if (!peerSession?.isOpen) {
+  if (!canSendToPeer()) {
     setStatus(['친구의 접속을 기다리는 중입니다.']);
   } else if (!timeSyncReady) {
     setStatus(['연결 완료. 시간 보정을 기다리는 중입니다.']);
@@ -512,6 +511,50 @@ function updateStartButton() {
   } else {
     setStatus(['준비 완료. 게임을 시작할 수 있습니다.']);
   }
+}
+
+function setupRelayTransportIfReady() {
+  if (relayReady || !signalingRoom || !localPlayer || !remotePlayer) return;
+  relayReady = true;
+  signalingRoom.onRelayMessages(localPlayer.id, handlePeerMessage);
+  if (!peerSession?.isOpen) {
+    setStatus(['Firebase relay 준비 완료.', 'P2P 연결이 실패하면 relay로 진행합니다.']);
+    sendToPeer({
+      type: MessageType.Hello,
+      player: localPlayer,
+    });
+    startTimeSyncIfReady();
+  }
+}
+
+function startTimeSyncIfReady() {
+  if (timeSyncStarted || !canSendToPeer()) return;
+  timeSyncStarted = true;
+
+  if (role === 'host') {
+    hostTimeSync = new HostTimeSync(sendToPeer);
+  } else {
+    clientTimeSync = new ClientTimeSync(sendToPeer);
+    clientTimeSync.addEventListener('done', (event) => {
+      clientOffsetToHost = event.detail.offsetToHost;
+      setLatencyInfo(event.detail);
+      setStatus(['시간 보정 완료.', '방장이 게임을 시작할 때까지 기다리세요.']);
+    });
+    clientTimeSync.start();
+  }
+}
+
+function canSendToPeer() {
+  return Boolean(peerSession?.isOpen || (relayReady && remotePlayer));
+}
+
+function sendToPeer(message) {
+  if (peerSession?.isOpen) return peerSession.send(message);
+  if (relayReady && remotePlayer) {
+    signalingRoom.sendRelayMessage(remotePlayer.id, message);
+    return true;
+  }
+  return false;
 }
 
 function startTimer(timeoutAt) {

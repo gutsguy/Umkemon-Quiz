@@ -81,6 +81,23 @@ export class SignalingRoom {
     });
   }
 
+  async sendRelayMessage(targetPlayerId, message) {
+    await push(child(this.roomRef, `relay/${targetPlayerId}`), {
+      message,
+      createdAt: serverTimestamp(),
+    });
+  }
+
+  onRelayMessages(playerId, callback) {
+    const relayRef = child(this.roomRef, `relay/${playerId}`);
+    onChildAdded(relayRef, async (snapshot) => {
+      const value = snapshot.val();
+      if (value?.message) callback(value.message);
+      await remove(snapshot.ref);
+    });
+    this.unsubscribers.push(() => off(relayRef));
+  }
+
   onRemoteCandidates(side, callback) {
     const candidatesRef = child(this.roomRef, `${side}Candidates`);
     onChildAdded(candidatesRef, (snapshot) => callback(snapshot.val()));

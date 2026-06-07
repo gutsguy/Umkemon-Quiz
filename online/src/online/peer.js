@@ -17,12 +17,26 @@ export class PeerSession extends EventTarget {
     this.channel = null;
     this.isOpen = false;
     this.pendingRemoteCandidates = [];
+    this.localCandidateKeys = new Set();
 
     this.connection.addEventListener('icecandidate', (event) => {
       if (event.candidate) {
-        const localSide = this.role === 'host' ? 'host' : 'guest';
-        this.signalingRoom.addCandidate(localSide, event.candidate, this.uid);
+        this.publishLocalCandidate(event.candidate);
       }
+    });
+
+    this.connection.addEventListener('icegatheringstatechange', () => {
+      if (this.connection.iceGatheringState === 'complete') {
+        this.publishLocalCandidatesFromSdp();
+      }
+    });
+
+    this.connection.addEventListener('icecandidateerror', (event) => {
+      this.dispatchEvent(
+        new CustomEvent('candidateerror', {
+          detail: event,
+        })
+      );
     });
 
     this.connection.addEventListener('connectionstatechange', () => {
@@ -59,6 +73,7 @@ export class PeerSession extends EventTarget {
     const offer = await this.connection.createOffer();
     await this.connection.setLocalDescription(offer);
     await this.signalingRoom.setOffer(offer, this.uid);
+    window.setTimeout(() => this.publishLocalCandidatesFromSdp(), 1500);
   }
 
   async startAsGuest(offer) {
@@ -71,6 +86,7 @@ export class PeerSession extends EventTarget {
     const answer = await this.connection.createAnswer();
     await this.connection.setLocalDescription(answer);
     await this.signalingRoom.setAnswer(answer, this.uid);
+    window.setTimeout(() => this.publishLocalCandidatesFromSdp(), 1500);
   }
 
   setChannel(channel) {
@@ -111,8 +127,49 @@ export class PeerSession extends EventTarget {
     }
   }
 
+  publishLocalCandidate(candidate) {
+    const json = candidate.toJSON ? candidate.toJSON() : candidate;
+    const key = candidateKey(json);
+    if (this.localCandidateKeys.has(key)) return;
+    this.localCandidateKeys.add(key);
+
+    const localSide = this.role === 'host' ? 'host' : 'guest';
+    this.signalingRoom.addCandidate(localSide, { toJSON: () => json }, this.uid).catch((error) => {
+      this.dispatchEvent(
+        new CustomEvent('candidatepublisherror', {
+          detail: error,
+        })
+      );
+    });
+  }
+
+  publishLocalCandidatesFromSdp() {
+    const sdp = this.connection.localDescription?.sdp;
+    if (!sdp) return;
+
+    let currentMid = '0';
+    let currentMLineIndex = -1;
+    for (const line of sdp.split(/\r?\n/)) {
+      if (line.startsWith('m=')) {
+        currentMLineIndex++;
+      } else if (line.startsWith('a=mid:')) {
+        currentMid = line.slice('a=mid:'.length);
+      } else if (line.startsWith('a=candidate:')) {
+        this.publishLocalCandidate({
+          candidate: line.slice(2),
+          sdpMid: currentMid,
+          sdpMLineIndex: Math.max(currentMLineIndex, 0),
+        });
+      }
+    }
+  }
+
   close() {
     if (this.channel) this.channel.close();
     this.connection.close();
   }
+}
+
+function candidateKey(candidate) {
+  return `${candidate.candidate}|${candidate.sdpMid ?? ''}|${candidate.sdpMLineIndex ?? ''}`;
 }

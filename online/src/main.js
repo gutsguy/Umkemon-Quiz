@@ -239,6 +239,14 @@ function bindPeerEvents() {
     setStatus([`연결 상태: ${event.detail}`]);
   });
 
+  peerSession.addEventListener('candidatepublisherror', (event) => {
+    setStatus(['ICE 후보를 Firebase에 쓰지 못했습니다.', event.detail.message]);
+  });
+
+  peerSession.addEventListener('candidateerror', () => {
+    setStatus(['STUN 후보 수집 중 오류가 발생했습니다.', '다른 네트워크에서 다시 시도하거나 TURN/relay가 필요할 수 있습니다.']);
+  });
+
   peerSession.addEventListener('close', () => {
     setStatus(['연결이 종료되었습니다.']);
   });

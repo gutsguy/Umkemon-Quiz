@@ -1022,6 +1022,7 @@ initGenGrid();
 
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
 const firebaseConfig = {
@@ -1035,6 +1036,9 @@ const firebaseConfig = {
 };
 
 firebase.initializeApp(firebaseConfig);
+const authReady = firebase.auth().signInAnonymously().catch(err => {
+  console.error("Firebase 익명 인증 실패:", err);
+});
 const db = firebase.database();
 
 // ── 리더보드 탭 전환 ──
@@ -1049,13 +1053,13 @@ function switchLbTab(quizMode) {
 // ── 점수 저장 (퀴즈 모드 포함) ──
 function saveScore(nickname, streakVal) {
   if (streakVal <= 0) return Promise.resolve();
-  return db.ref("scores").push({
+  return authReady.then(() => db.ref("scores").push({
     name: nickname,
     streak: streakVal,
     quizMode: SILHOUETTE_MODE,
     failedPokemon: currentPokemon ? currentPokemon.displayName : "",
     ts: Date.now()
-  });
+  }));
 }
 
 function saveAndReturn() {

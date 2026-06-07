@@ -1,0 +1,139 @@
+#game-screen {
+  align-items: stretch;
+  justify-content: center;
+}
+
+.game-shell {
+  display: grid;
+  grid-template-columns: 220px minmax(360px, 1fr) 300px;
+  gap: 16px;
+  width: min(1220px, 100%);
+  margin: auto;
+}
+
+.scoreboard,
+.chat {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 16px;
+}
+
+#scoreboard {
+  display: grid;
+  gap: 8px;
+}
+
+.score-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #171b2a;
+}
+
+.latency {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.stage {
+  display: grid;
+  align-content: center;
+  gap: 12px;
+  min-height: calc(100vh - 56px);
+}
+
+.round-meta {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.timer {
+  color: var(--warn);
+  font-size: 20px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.image-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 420px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #171b2a;
+  overflow: hidden;
+}
+
+#pokemon-canvas,
+#pokemon-original {
+  display: none;
+  max-width: 360px;
+  max-height: 360px;
+}
+
+.loading {
+  color: var(--muted);
+}
+
+.answer-banner {
+  min-height: 56px;
+  text-align: center;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.chat-message {
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #171b2a;
+  line-height: 1.4;
+}
+
+.chat-message .name {
+  color: var(--warn);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.chat-message.correct {
+  border: 1px solid var(--accent-2);
+}
+
+.chat-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+@media (max-width: 960px) {
+  .game-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .stage {
+    min-height: auto;
+  }
+
+  .chat-log {
+    height: 220px;
+  }
+}

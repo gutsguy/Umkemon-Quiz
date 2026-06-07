@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>엄켓몬 온라인 배틀</title>
+  </head>
+  <body>
+    <main id="app">
+      <section class="screen active" id="home-screen">
+        <div class="brand">
+          <h1>엄켓몬 온라인 배틀</h1>
+          <p>같은 포켓몬을 보고 먼저 정답을 입력하세요.</p>
+        </div>
+
+        <div class="panel lobby-panel">
+          <label class="field">
+            <span>닉네임</span>
+            <input id="nickname-input" maxlength="12" autocomplete="nickname" />
+          </label>
+
+          <div class="settings-grid">
+            <div>
+              <h2>세대 선택</h2>
+              <div class="gen-grid" id="generation-grid"></div>
+            </div>
+
+            <div>
+              <h2>퀴즈 모드</h2>
+              <div class="segmented" id="mode-select">
+                <button class="selected" data-mode="pixelate">픽셀화</button>
+                <button data-mode="silhouette">실루엣</button>
+              </div>
+
+              <h2>목표 점수</h2>
+              <div class="segmented" id="target-score-select">
+                <button data-score="5">5점</button>
+                <button class="selected" data-score="10">10점</button>
+                <button data-score="15">15점</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="room-actions">
+            <button class="primary" id="create-room-btn">방 만들기</button>
+            <div class="join-row">
+              <input id="join-code-input" placeholder="방 코드" autocomplete="off" />
+              <button id="join-room-btn">참가</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="room-screen">
+        <div class="topbar">
+          <button class="ghost" id="leave-room-btn">나가기</button>
+          <div>
+            <div class="eyebrow">방 코드</div>
+            <button class="room-code" id="room-code-btn" title="클릭해서 복사"></button>
+          </div>
+        </div>
+
+        <div class="room-layout">
+          <div class="panel">
+            <h2>대기방</h2>
+            <div class="status-list" id="connection-status"></div>
+            <div class="player-list" id="player-list"></div>
+            <button class="primary" id="start-game-btn" disabled>게임 시작</button>
+          </div>
+
+          <div class="panel">
+            <h2>방 설정</h2>
+            <div id="room-settings-summary"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="game-screen">
+        <div class="game-shell">
+          <aside class="scoreboard panel">
+            <h2>점수</h2>
+            <div id="scoreboard"></div>
+            <div class="latency" id="latency-panel"></div>
+          </aside>
+
+          <section class="stage">
+            <div class="round-meta">
+              <span id="round-label">Round 1</span>
+              <span id="round-state">대기 중</span>
+            </div>
+            <div class="timer" id="round-timer">0.000초</div>
+            <div class="image-card">
+              <canvas id="pokemon-canvas"></canvas>
+              <img id="pokemon-original" alt="" />
+              <div class="loading" id="game-loading">문제를 기다리는 중...</div>
+            </div>
+            <div class="answer-banner" id="answer-banner"></div>
+          </section>
+
+          <aside class="chat panel">
+            <h2>답변 채팅</h2>
+            <div class="chat-log" id="chat-log"></div>
+            <form class="chat-form" id="chat-form">
+              <input id="chat-input" autocomplete="off" placeholder="정답 입력" />
+              <button class="primary" type="submit">전송</button>
+            </form>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <script src="/pokemon_data.js"></script>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

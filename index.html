@@ -34,6 +34,32 @@
   .main-hero h1 { margin-bottom: 4px; }
   .main-sub { color: #888; font-size: 1rem; }
   .main-buttons { display: flex; gap: 16px; margin-top: 8px; }
+  .online-entry {
+    width: 100%; max-width: 400px;
+    display: flex; justify-content: center;
+  }
+  .btn-online {
+    display: block;
+    width: 100%;
+    text-decoration: none;
+    text-align: center;
+    background: #0f3460;
+    color: #fff;
+    font-size: 1.05rem;
+    padding: 14px 24px;
+    border-radius: 12px;
+    font-weight: bold;
+    border: 2px solid #1b5d9b;
+    transition: transform 0.1s, border-color 0.2s;
+  }
+  .btn-online:active { transform: scale(0.98); }
+  .btn-online:hover { border-color: #00b894; }
+  .btn-online .mode-desc {
+    font-size: 0.75rem;
+    font-weight: normal;
+    margin-top: 4px;
+    opacity: 0.85;
+  }
   .main-leaderboard {
     display: flex; flex-direction: column;
     align-items: center; gap: 12px;
@@ -299,6 +325,13 @@
       랭크모드
       <div class="mode-desc">전 세대 / 20초 제한 / 1틀 게임오버</div>
     </button>
+  </div>
+
+  <div class="online-entry">
+    <a class="btn-online" href="./online/">
+      온라인 배틀
+      <div class="mode-desc">방 코드로 접속 / 실시간 선착 정답</div>
+    </a>
   </div>
 
   <div class="main-rules">

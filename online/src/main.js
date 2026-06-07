@@ -12,7 +12,7 @@ import {
   pickQuestion,
 } from './core/quiz-core.js';
 import { isCorrectAnswer } from './core/answer-checker.js';
-import { drawPokemon, loadArtwork } from './core/image-renderer.js';
+import { createRevealRenderer, loadArtwork } from './core/image-renderer.js';
 import { createPlayerId, createRoomCode, normalizeRoomCode } from './online/room-code.js';
 import { MessageType } from './online/protocol.js';
 import { PeerSession } from './online/peer.js';
@@ -68,6 +68,7 @@ let timerInterval = null;
 let usedQuestionIds = new Set();
 let timeSyncReady = false;
 let authUser = null;
+let revealRenderer = null;
 
 initGenerationGrid(selectedGenerations);
 initSegmentedControl('#mode-select', 'mode', (mode) => {
@@ -344,7 +345,8 @@ async function showQuestion(question) {
   const url = artworkUrl(currentPokemon.id, currentPokemon.isShiny);
   const fallbackUrl = currentPokemon.isShiny ? artworkUrl(currentPokemon.id, false) : null;
   const img = await loadArtwork(url, fallbackUrl);
-  drawPokemon(document.querySelector('#pokemon-canvas'), img, question.quizMode);
+  revealRenderer = createRevealRenderer(document.querySelector('#pokemon-canvas'), img, question.quizMode);
+  revealRenderer.render(0);
   showCanvas();
   startTimer(question.timeoutAt);
 
@@ -506,10 +508,14 @@ function updateStartButton() {
 
 function startTimer(timeoutAt) {
   clearInterval(timerInterval);
+  const duration = timeoutAt - currentQuestion.startAt;
   const tick = () => {
     const hostNow = role === 'host' ? Date.now() : Date.now() + clientOffsetToHost;
     const left = Math.max(0, timeoutAt - hostNow);
-    setTimerText(`${(left / 1000).toFixed(3)}초`);
+    const elapsed = Math.max(0, Math.min(duration, duration - left));
+    const progress = duration > 0 ? elapsed / duration : 1;
+    setTimerText(progress);
+    revealRenderer?.render(progress);
   };
   tick();
   timerInterval = window.setInterval(tick, 60);

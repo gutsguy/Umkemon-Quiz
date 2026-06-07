@@ -94,8 +94,12 @@ export function setRoundMeta(roundId, state) {
   document.querySelector('#round-state').textContent = state;
 }
 
-export function setTimerText(text) {
-  document.querySelector('#round-timer').textContent = text;
+export function setTimerText(progress) {
+  const fill = document.querySelector('#round-timer-fill');
+  if (!fill) return;
+  const clamped = Math.max(0, Math.min(1, progress));
+  fill.style.width = `${(1 - clamped) * 100}%`;
+  fill.classList.toggle('danger', clamped > 0.75);
 }
 
 export function setAnswerBanner(html) {

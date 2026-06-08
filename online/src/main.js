@@ -641,6 +641,7 @@ function finalizeRound(winner) {
     displayName: currentPokemon.displayName,
     genLabel: currentPokemon.genLabel,
     artwork: artworkUrl(currentPokemon.id, currentPokemon.isShiny),
+    isShiny: currentPokemon.isShiny,
     scores,
   };
 
@@ -672,10 +673,12 @@ function applyRoundResult(result) {
   const winnerText = result.winner
     ? `${result.winner.nickname} 정답 (${(result.winner.reactionTime / 1000).toFixed(3)}초)`
     : '시간 초과';
+  const shinyTag = result.isShiny ? ' <span class="shiny-tag">(엄로치)</span>' : '';
   setRoundMeta(result.roundId, '라운드 종료');
   setAnswerBanner(`
-    <div>${winnerText}</div>
-    <div>${result.correctAnswer} · ${result.displayName} · ${result.genLabel}</div>
+    <div class="round-result-meta">${escapeHtml(winnerText)}</div>
+    <span class="name-reveal">${escapeHtml(result.correctAnswer)}${shinyTag}</span>
+    <span class="name-original">${escapeHtml(result.displayName)} · ${escapeHtml(result.genLabel)}</span>
   `);
 }
 
@@ -684,7 +687,20 @@ function applyGameOver(message) {
   clearRoundTimers();
   const winner = players.find((player) => player.id === message.winnerId);
   setRoundMeta(roundId, '게임 종료');
-  setAnswerBanner(`<div>게임 종료</div><div>승자: ${winner ? winner.nickname : '-'}</div>`);
+  setAnswerBanner(`<div>게임 종료</div><div>승자: ${winner ? escapeHtml(winner.nickname) : '-'}</div>`);
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (char) => {
+    const chars = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;',
+    };
+    return chars[char];
+  });
 }
 
 function updateStartButton() {

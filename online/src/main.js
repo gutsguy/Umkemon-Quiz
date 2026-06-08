@@ -12,7 +12,12 @@ import {
   pickQuestion,
 } from './core/quiz-core.js';
 import { isCorrectAnswer } from './core/answer-checker.js';
-import { createRevealRenderer, loadArtwork } from './core/image-renderer.js';
+import {
+  createRevealRenderer,
+  loadArtwork,
+  REVEAL_INTERVAL,
+  REVEAL_STEPS,
+} from './core/image-renderer.js';
 import { createPlayerId, createRoomCode, normalizeRoomCode } from './online/room-code.js';
 import { MessageType } from './online/protocol.js';
 import { PeerSession } from './online/peer.js';
@@ -71,6 +76,8 @@ let authUser = null;
 let revealRenderer = null;
 let relayReady = false;
 let timeSyncStarted = false;
+let revealTimer = null;
+let revealStep = 0;
 
 initGenerationGrid(selectedGenerations);
 initSegmentedControl('#mode-select', 'mode', (mode) => {
@@ -335,6 +342,7 @@ async function receiveQuestion(question) {
   currentQuestion = question;
   roundResolved = false;
   correctCandidates = [];
+  stopRevealTimer();
   resetGameVisuals();
   setRoundMeta(question.roundId, '곧 시작');
 
@@ -353,9 +361,10 @@ async function showQuestion(question) {
   const fallbackUrl = currentPokemon.isShiny ? artworkUrl(currentPokemon.id, false) : null;
   const img = await loadArtwork(url, fallbackUrl);
   revealRenderer = createRevealRenderer(document.querySelector('#pokemon-canvas'), img, question.quizMode);
-  revealRenderer.render(0);
+  revealRenderer.drawInitial();
   showCanvas();
   startTimer(question.timeoutAt);
+  startRevealTimer();
 
   if (role === 'host') {
     window.setTimeout(() => {
@@ -438,6 +447,7 @@ function finalizeRound(winner) {
   if (roundResolved) return;
   roundResolved = true;
   clearInterval(timerInterval);
+  stopRevealTimer();
   clearTimeout(finalizeTimer);
   finalizeTimer = null;
 
@@ -477,6 +487,7 @@ function finalizeRound(winner) {
 function applyRoundResult(result) {
   roundResolved = true;
   clearInterval(timerInterval);
+  stopRevealTimer();
   renderScoreboard(players, result.scores);
   showOriginalImage(result.artwork);
 
@@ -492,6 +503,7 @@ function applyRoundResult(result) {
 
 function applyGameOver(message) {
   clearInterval(timerInterval);
+  stopRevealTimer();
   const winner = players.find((player) => player.id === message.winnerId);
   setRoundMeta(roundId, '게임 종료');
   setAnswerBanner(`<div>게임 종료</div><div>승자: ${winner ? winner.nickname : '-'}</div>`);
@@ -566,10 +578,28 @@ function startTimer(timeoutAt) {
     const elapsed = Math.max(0, Math.min(duration, duration - left));
     const progress = duration > 0 ? elapsed / duration : 1;
     setTimerText(progress);
-    revealRenderer?.render(progress);
   };
   tick();
   timerInterval = window.setInterval(tick, 60);
+}
+
+function startRevealTimer() {
+  stopRevealTimer();
+  revealStep = 0;
+  revealTimer = window.setInterval(() => {
+    revealStep++;
+    if (revealStep >= REVEAL_STEPS) {
+      stopRevealTimer();
+    }
+    revealRenderer?.revealStep(revealStep);
+  }, REVEAL_INTERVAL);
+}
+
+function stopRevealTimer() {
+  if (revealTimer) {
+    clearInterval(revealTimer);
+    revealTimer = null;
+  }
 }
 
 async function copyRoomCode() {

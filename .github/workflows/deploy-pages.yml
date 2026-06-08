@@ -42,6 +42,7 @@ jobs:
         run: |
           mkdir -p _site/online
           cp index.html _site/index.html
+          cp favicon.svg _site/favicon.svg
           cp pokemon_data.js _site/pokemon_data.js
           cp -R online/dist/* _site/online/
           touch _site/.nojekyll

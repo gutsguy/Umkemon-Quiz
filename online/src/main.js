@@ -541,12 +541,16 @@ function showPreparedQuestion(messageRoundId) {
 
 function submitAnswer(event) {
   event.preventDefault();
-  if (!currentQuestion || roundResolved || !acceptingAnswers) return;
 
   const input = document.querySelector('#chat-input');
   const text = input.value.trim();
   if (!text) return;
   input.value = '';
+
+  if (!currentQuestion || roundResolved || !acceptingAnswers) {
+    sendChatMessage(text);
+    return;
+  }
 
   const message = {
     type: MessageType.Answer,
@@ -562,6 +566,18 @@ function submitAnswer(event) {
   } else {
     sendToPeer(message);
   }
+}
+
+function sendChatMessage(text) {
+  const message = {
+    type: MessageType.Chat,
+    playerId: localPlayer.id,
+    nickname: localPlayer.nickname,
+    text,
+    correct: false,
+  };
+  appendChatMessage(message);
+  sendToPeer(message);
 }
 
 function handleAnswerAsHost(message) {

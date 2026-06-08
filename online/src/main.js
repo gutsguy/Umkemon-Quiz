@@ -44,6 +44,7 @@ import {
 
 const ROUND_SECONDS = 20;
 const QUESTION_DELAY_MS = 3000;
+const QUESTION_REPLACE_DELAY_MS = 1200;
 const MIN_REACTION_MS = 100;
 const ADJUDICATION_WAIT_MS = 650;
 
@@ -78,6 +79,13 @@ let relayReady = false;
 let timeSyncStarted = false;
 let revealTimer = null;
 let revealStep = 0;
+let loadedQuestionImage = null;
+let readyPlayerIds = new Set();
+let questionStartSent = false;
+let pendingStartMessage = null;
+let startQuestionTimer = null;
+let roundTimeoutTimer = null;
+let acceptingAnswers = false;
 
 initGenerationGrid(selectedGenerations);
 initSegmentedControl('#mode-select', 'mode', (mode) => {
@@ -288,6 +296,15 @@ function handlePeerMessage(message) {
     case MessageType.Question:
       receiveQuestion(message.question);
       break;
+    case MessageType.QuestionReady:
+      if (role === 'host') handleQuestionReady(message);
+      break;
+    case MessageType.QuestionLoadFailed:
+      if (role === 'host') handleQuestionLoadFailed(message);
+      break;
+    case MessageType.QuestionStart:
+      beginQuestion(message);
+      break;
     case MessageType.Answer:
       if (role === 'host') handleAnswerAsHost(message);
       break;
@@ -320,19 +337,23 @@ function startGameAsHost() {
 function nextQuestionAsHost() {
   roundId++;
   roundResolved = false;
+  acceptingAnswers = false;
   correctCandidates = [];
-  clearTimeout(finalizeTimer);
+  readyPlayerIds = new Set();
+  questionStartSent = false;
+  pendingStartMessage = null;
+  loadedQuestionImage = null;
+  clearRoundTimers();
 
   const pool = getAllowedPool(pokemonDb, settings.generations);
-  currentQuestion = pickQuestion(pool, usedQuestionIds);
-  usedQuestionIds.add(currentQuestion.pokemonId);
+  const pickedQuestion = pickQuestion(pool, usedQuestionIds);
+  usedQuestionIds.add(pickedQuestion.pokemonId);
   const question = {
     roundId,
-    ...currentQuestion,
+    ...pickedQuestion,
     quizMode: settings.quizMode,
-    startAt: Date.now() + QUESTION_DELAY_MS,
-    timeoutAt: Date.now() + QUESTION_DELAY_MS + ROUND_SECONDS * 1000,
   };
+  currentQuestion = question;
 
   sendToPeer({ type: MessageType.Question, question });
   receiveQuestion(question);
@@ -341,43 +362,186 @@ function nextQuestionAsHost() {
 async function receiveQuestion(question) {
   currentQuestion = question;
   roundResolved = false;
+  acceptingAnswers = false;
   correctCandidates = [];
-  stopRevealTimer();
+  readyPlayerIds = new Set();
+  questionStartSent = false;
+  pendingStartMessage = null;
+  loadedQuestionImage = null;
+  currentPokemon = null;
+  clearRoundTimers();
   resetGameVisuals();
-  setRoundMeta(question.roundId, '곧 시작');
-
-  const hostNow = role === 'host' ? Date.now() : Date.now() + clientOffsetToHost;
-  const delay = Math.max(0, question.startAt - hostNow);
-  window.setTimeout(() => showQuestion(question), delay);
-}
-
-async function showQuestion(question) {
-  const basePokemon = findPokemonById(pokemonDb, question.pokemonId);
-  currentPokemon = decoratePokemon(basePokemon, '엄', question.shiny);
-  setRoundMeta(question.roundId, '정답 입력 가능');
+  setTimerText(0);
+  setRoundMeta(question.roundId, '이미지 로딩');
   setAnswerBanner('');
 
-  const url = artworkUrl(currentPokemon.id, currentPokemon.isShiny);
-  const fallbackUrl = currentPokemon.isShiny ? artworkUrl(currentPokemon.id, false) : null;
+  try {
+    const { pokemon, img } = await preloadQuestionArtwork(question);
+    if (!currentQuestion || currentQuestion.roundId !== question.roundId || roundResolved) return;
+
+    currentPokemon = pokemon;
+    loadedQuestionImage = img;
+    setRoundMeta(question.roundId, role === 'host' ? '상대 로딩 대기' : '방장 시작 대기');
+
+    if (pendingStartMessage?.roundId === question.roundId) {
+      beginQuestion(pendingStartMessage);
+      return;
+    }
+
+    if (role === 'host') {
+      markQuestionReady(localPlayer.id, question.roundId);
+    } else {
+      sendToPeer({
+        type: MessageType.QuestionReady,
+        roundId: question.roundId,
+        playerId: localPlayer.id,
+      });
+    }
+  } catch (error) {
+    if (!currentQuestion || currentQuestion.roundId !== question.roundId || roundResolved) return;
+    console.error('Failed to preload question artwork:', error);
+    setRoundMeta(question.roundId, '이미지 로딩 실패');
+    setAnswerBanner('<div>이미지를 불러오지 못했습니다. 다음 문제로 넘어갑니다.</div>');
+
+    if (role === 'host') {
+      scheduleReplacementQuestion(question.roundId);
+    } else {
+      sendToPeer({
+        type: MessageType.QuestionLoadFailed,
+        roundId: question.roundId,
+        playerId: localPlayer.id,
+        message: error.message,
+      });
+    }
+  }
+}
+
+async function preloadQuestionArtwork(question) {
+  const basePokemon = findPokemonById(pokemonDb, question.pokemonId);
+  if (!basePokemon) throw new Error(`Unknown Pokemon id: ${question.pokemonId}`);
+
+  const pokemon = decoratePokemon(basePokemon, '엄', question.shiny);
+  const url = artworkUrl(pokemon.id, pokemon.isShiny);
+  const fallbackUrl = pokemon.isShiny ? artworkUrl(pokemon.id, false) : null;
   const img = await loadArtwork(url, fallbackUrl);
-  revealRenderer = createRevealRenderer(document.querySelector('#pokemon-canvas'), img, question.quizMode);
+  return { pokemon, img };
+}
+
+function handleQuestionReady(message) {
+  if (!currentQuestion || message.roundId !== currentQuestion.roundId || roundResolved) return;
+  markQuestionReady(message.playerId, message.roundId);
+}
+
+function handleQuestionLoadFailed(message) {
+  if (!currentQuestion || message.roundId !== currentQuestion.roundId || roundResolved) return;
+  setRoundMeta(message.roundId, '상대 이미지 로딩 실패');
+  setAnswerBanner('<div>상대가 이미지를 불러오지 못했습니다. 다음 문제로 넘어갑니다.</div>');
+  scheduleReplacementQuestion(message.roundId);
+}
+
+function scheduleReplacementQuestion(messageRoundId) {
+  if (role !== 'host' || !currentQuestion || currentQuestion.roundId !== messageRoundId || roundResolved) return;
+
+  roundResolved = true;
+  acceptingAnswers = false;
+  clearRoundTimers();
+  window.setTimeout(() => {
+    if (role === 'host') nextQuestionAsHost();
+  }, QUESTION_REPLACE_DELAY_MS);
+}
+
+function markQuestionReady(playerId, messageRoundId) {
+  if (role !== 'host' || !currentQuestion || currentQuestion.roundId !== messageRoundId || roundResolved) {
+    return;
+  }
+
+  readyPlayerIds.add(playerId);
+  const expectedPlayerIds = players.map((player) => player.id);
+  const allReady =
+    expectedPlayerIds.length >= 2 && expectedPlayerIds.every((expectedId) => readyPlayerIds.has(expectedId));
+
+  if (allReady) startQuestionAsHost();
+}
+
+function startQuestionAsHost() {
+  if (questionStartSent || !currentQuestion || !loadedQuestionImage || roundResolved) return;
+
+  questionStartSent = true;
+  const startAt = Date.now() + QUESTION_DELAY_MS;
+  const timeoutAt = startAt + ROUND_SECONDS * 1000;
+  const message = {
+    type: MessageType.QuestionStart,
+    roundId: currentQuestion.roundId,
+    startAt,
+    timeoutAt,
+  };
+  currentQuestion = {
+    ...currentQuestion,
+    startAt,
+    timeoutAt,
+  };
+
+  sendToPeer(message);
+  beginQuestion(message);
+}
+
+function beginQuestion(message) {
+  if (!currentQuestion || message.roundId !== currentQuestion.roundId || roundResolved) return;
+
+  currentQuestion = {
+    ...currentQuestion,
+    startAt: message.startAt,
+    timeoutAt: message.timeoutAt,
+  };
+
+  if (!loadedQuestionImage || !currentPokemon) {
+    pendingStartMessage = message;
+    return;
+  }
+
+  const hostNow = role === 'host' ? Date.now() : Date.now() + clientOffsetToHost;
+  const delay = Math.max(0, message.startAt - hostNow);
+  clearTimeout(startQuestionTimer);
+  startQuestionTimer = window.setTimeout(() => showPreparedQuestion(message.roundId), delay);
+}
+
+function showPreparedQuestion(messageRoundId) {
+  if (
+    !currentQuestion ||
+    currentQuestion.roundId !== messageRoundId ||
+    !loadedQuestionImage ||
+    !currentPokemon ||
+    roundResolved
+  ) {
+    return;
+  }
+
+  acceptingAnswers = true;
+  setRoundMeta(currentQuestion.roundId, '정답 입력 가능');
+  setAnswerBanner('');
+  revealRenderer = createRevealRenderer(
+    document.querySelector('#pokemon-canvas'),
+    loadedQuestionImage,
+    currentQuestion.quizMode
+  );
   revealRenderer.drawInitial();
   showCanvas();
-  startTimer(question.timeoutAt);
+  startTimer(currentQuestion.timeoutAt);
   startRevealTimer();
 
   if (role === 'host') {
-    window.setTimeout(() => {
-      if (!roundResolved && question.roundId === roundId) {
+    clearTimeout(roundTimeoutTimer);
+    roundTimeoutTimer = window.setTimeout(() => {
+      if (!roundResolved && currentQuestion?.roundId === roundId) {
         finalizeRound(null);
       }
-    }, Math.max(0, question.timeoutAt - Date.now()));
+    }, Math.max(0, currentQuestion.timeoutAt - Date.now()));
   }
 }
 
 function submitAnswer(event) {
   event.preventDefault();
-  if (!currentQuestion || roundResolved) return;
+  if (!currentQuestion || roundResolved || !acceptingAnswers) return;
 
   const input = document.querySelector('#chat-input');
   const text = input.value.trim();
@@ -401,7 +565,7 @@ function submitAnswer(event) {
 }
 
 function handleAnswerAsHost(message) {
-  if (!currentQuestion || message.roundId !== currentQuestion.roundId || roundResolved) return;
+  if (!currentQuestion || message.roundId !== currentQuestion.roundId || roundResolved || !acceptingAnswers) return;
 
   const player = players.find((item) => item.id === message.playerId) || {
     id: message.playerId,
@@ -446,10 +610,8 @@ function handleAnswerAsHost(message) {
 function finalizeRound(winner) {
   if (roundResolved) return;
   roundResolved = true;
-  clearInterval(timerInterval);
-  stopRevealTimer();
-  clearTimeout(finalizeTimer);
-  finalizeTimer = null;
+  acceptingAnswers = false;
+  clearRoundTimers();
 
   if (winner) {
     scores[winner.playerId] = (scores[winner.playerId] || 0) + 1;
@@ -486,8 +648,8 @@ function finalizeRound(winner) {
 
 function applyRoundResult(result) {
   roundResolved = true;
-  clearInterval(timerInterval);
-  stopRevealTimer();
+  acceptingAnswers = false;
+  clearRoundTimers();
   renderScoreboard(players, result.scores);
   showOriginalImage(result.artwork);
 
@@ -502,8 +664,8 @@ function applyRoundResult(result) {
 }
 
 function applyGameOver(message) {
-  clearInterval(timerInterval);
-  stopRevealTimer();
+  acceptingAnswers = false;
+  clearRoundTimers();
   const winner = players.find((player) => player.id === message.winnerId);
   setRoundMeta(roundId, '게임 종료');
   setAnswerBanner(`<div>게임 종료</div><div>승자: ${winner ? winner.nickname : '-'}</div>`);
@@ -600,6 +762,18 @@ function stopRevealTimer() {
     clearInterval(revealTimer);
     revealTimer = null;
   }
+}
+
+function clearRoundTimers() {
+  clearTimeout(finalizeTimer);
+  finalizeTimer = null;
+  clearTimeout(startQuestionTimer);
+  startQuestionTimer = null;
+  clearTimeout(roundTimeoutTimer);
+  roundTimeoutTimer = null;
+  clearInterval(timerInterval);
+  timerInterval = null;
+  stopRevealTimer();
 }
 
 async function copyRoomCode() {

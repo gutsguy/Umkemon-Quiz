@@ -3,3 +3,9 @@ __pycache__/
 *.pyc
 .python-version
 uv.lock
+
+# Online app
+/online/node_modules/
+/online/dist/
+/online/vite-dev*.log
+/online/npm-debug.log*

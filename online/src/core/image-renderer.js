@@ -3,7 +3,29 @@ const PIXEL_BLOCK_END = 1;
 export const REVEAL_INTERVAL = 3000;
 export const REVEAL_STEPS = 10;
 
-export function loadArtwork(url, fallbackUrl = null) {
+const DEFAULT_LOAD_RETRIES = 2;
+const DEFAULT_RETRY_DELAY_MS = 500;
+
+export async function loadArtwork(url, fallbackUrl = null, options = {}) {
+  const retries = options.retries ?? DEFAULT_LOAD_RETRIES;
+  const retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
+  let lastError = null;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await loadArtworkOnce(url, fallbackUrl);
+    } catch (error) {
+      lastError = error;
+      if (attempt < retries) {
+        await delay(retryDelayMs * (attempt + 1));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+function loadArtworkOnce(url, fallbackUrl = null) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -16,6 +38,12 @@ export function loadArtwork(url, fallbackUrl = null) {
       }
     };
     img.src = url;
+  });
+}
+
+function delay(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
   });
 }
 

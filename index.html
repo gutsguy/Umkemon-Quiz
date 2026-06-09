@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>엄켓몬 실루엣 퀴즈</title>
+<title>엄켓몬 퀴즈</title>
 <link rel="icon" type="image/svg+xml" href="./favicon.svg">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -16,7 +16,24 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    position: relative;
+    overflow-x: hidden;
   }
+  #typographic-bg {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    display: block;
+    background: #151722;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+  }
+  body.main-background-visible #typographic-bg { opacity: 1; }
   h1 { font-size: 2rem; margin-bottom: 8px; color: #e94560; }
   .score { font-size: 1.1rem; color: #aaa; margin-bottom: 24px; }
 
@@ -26,11 +43,75 @@
     flex-direction: column;
     align-items: center;
     gap: 24px;
+    position: relative;
+    z-index: 1;
   }
   .screen.active { display: flex; }
   .screen h2 { font-size: 1.3rem; color: #ccc; }
 
   /* 메인 화면 */
+  #mainScreen {
+    width: 100%;
+    padding: 0;
+  }
+  .main-panel {
+    width: min(92vw, 520px);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    padding: 32px 32px 40px;
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(22, 28, 48, 0.92);
+    box-shadow: 0 0 80px rgba(0, 0, 0, 0.42);
+    backdrop-filter: blur(8px);
+    transition:
+      opacity 220ms ease,
+      transform 220ms ease,
+      filter 220ms ease;
+  }
+  #mainScreen.background-only .main-panel {
+    opacity: 0;
+    transform: translateY(8px);
+    filter: blur(4px);
+    pointer-events: none;
+  }
+  .background-toggle {
+    position: fixed;
+    right: 22px;
+    bottom: 22px;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+    background: rgba(23, 27, 42, 0.72);
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.32);
+    color: #eee;
+    backdrop-filter: blur(10px);
+  }
+  .background-toggle svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .background-toggle .icon-eye-off,
+  #mainScreen.background-only .background-toggle .icon-eye {
+    display: none;
+  }
+  #mainScreen.background-only .background-toggle .icon-eye-off {
+    display: block;
+  }
   .main-hero { text-align: center; }
   .main-hero h1 { margin-bottom: 4px; }
   .main-sub { color: #888; font-size: 1rem; }
@@ -171,7 +252,7 @@
     border: 2px solid #0f3460;
     position: relative; overflow: hidden;
   }
-  canvas { max-width: 280px; max-height: 280px; }
+  .image-container canvas { max-width: 280px; max-height: 280px; }
   .image-container img { max-width: 280px; max-height: 280px; display: none; }
   .loading { color: #555; font-size: 1.2rem; }
 
@@ -308,12 +389,15 @@
   .secret-box .btn-cancel { background: #333; color: #888; }
 </style>
 </head>
-<body>
+<body class="main-background-visible">
 
 <!-- 1. 메인 화면 -->
+<canvas id="typographic-bg" aria-hidden="true"></canvas>
+
 <div class="screen active" id="mainScreen">
+  <div class="main-panel">
   <div class="main-hero">
-    <h1 id="mainTitle" style="cursor:default; user-select:none;">엄켓몬 실루엣 퀴즈</h1>
+    <h1 id="mainTitle" style="cursor:default; user-select:none;">엄켓몬 퀴즈</h1>
     <p class="main-sub">게임 모드를 선택하세요</p>
   </div>
 
@@ -378,6 +462,19 @@
 </div>
 
 <!-- 2. 설정 화면 -->
+  <button class="background-toggle" id="backgroundToggle" type="button" aria-label="배경만 보기">
+    <svg class="icon-eye" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+    <svg class="icon-eye-off" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 3l18 18" />
+      <path d="M10.7 5.2A9.7 9.7 0 0 1 12 5c6 0 9.5 7 9.5 7a17 17 0 0 1-3 3.8" />
+      <path d="M6.2 6.7C3.9 8.3 2.5 12 2.5 12s3.5 7 9.5 7a9.8 9.8 0 0 0 4.1-.9" />
+      <path d="M9.9 9.9A3 3 0 0 0 14.1 14.1" />
+    </svg>
+  </button>
+</div>
 <div class="screen" id="selectScreen">
   <h1 id="settingsTitle">연습모드</h1>
   <h2>원하는 세대를 선택하세요</h2>
@@ -518,7 +615,14 @@ let currentLbTab = "pixelate";
 function showScreen(id) {
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
+  document.body.classList.toggle("main-background-visible", id === "mainScreen");
 }
+
+document.getElementById("backgroundToggle").addEventListener("click", () => {
+  const mainScreen = document.getElementById("mainScreen");
+  const enabled = mainScreen.classList.toggle("background-only");
+  document.getElementById("backgroundToggle").setAttribute("aria-label", enabled ? "메뉴 보기" : "배경만 보기");
+});
 
 function goToSettings(mode) {
   gameMode = mode;
@@ -1053,6 +1157,8 @@ POKEMON_DB = POKEMON_DB_RAW;
 POKEMON_DB.forEach(p => koNameCache.add(p.koName));
 initGenGrid();
 </script>
+
+<script type="module" src="./typographic-background-main.js"></script>
 
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>

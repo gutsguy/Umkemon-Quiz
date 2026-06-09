@@ -1,27 +1,20 @@
 import { measureNaturalWidth, prepareWithSegments } from '@chenglou/pretext';
+import { POPULAR_BACKGROUND_POKEMON_IDS } from '../data/popular-background-pokemon.js';
 
 const ARTWORK_BASE =
   'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork';
-const BACKGROUND_POKEMON_POOL = [
-  1, 3, 4, 6, 7, 9, 25, 26, 39, 54, 59, 94, 95, 130, 131, 133, 143, 149, 150, 151, 155, 157,
-  158, 160, 172, 175, 196, 197, 212, 214, 229, 248, 249, 250, 251, 252, 254, 255, 257, 258,
-  260, 282, 302, 303, 306, 330, 334, 350, 359, 373, 376, 380, 381, 384, 387, 389, 390, 392,
-  393, 395, 403, 405, 445, 448, 461, 470, 471, 475, 483, 484, 487, 488, 491, 493, 495, 497,
-  498, 500, 501, 503, 523, 530, 549, 571, 579, 612, 635, 637, 643, 644, 646, 647, 648, 649,
-  650, 652, 653, 655, 658, 663, 700, 701, 706, 715, 716, 717, 718, 722, 724, 725, 727, 728,
-  730, 745, 746, 778, 784, 791, 792, 800, 804, 812, 815, 818, 823, 849, 858, 887, 888, 889,
-  890, 891, 892, 905, 906, 908, 909, 911, 912, 914, 921, 923, 937, 959, 964, 967, 998, 1008,
-];
-const TOKENS = ['엄', '어', 'ㅁ', 'ㅇ', '.', 'UM', 'um'];
+const BACKGROUND_POKEMON_POOL = POPULAR_BACKGROUND_POKEMON_IDS;
+const TOKENS = ['엄', '엄', '어', 'ㅁ', 'UM', 'um'];
 const FONT_FAMILY = '"Malgun Gothic", "Apple SD Gothic Neo", "Segoe UI", sans-serif';
-const TILE_SIZE = 460;
-const TILE_GAP = 170;
+const TILE_SIZE = 430;
+const TILE_GAP_X = 120;
+const TILE_GAP_Y = 60;
 const SPEED_X = 27;
 const SPEED_Y = 16.2;
 const SAMPLE_STEP = 8;
 const MIN_ALPHA = 24;
-const BASE_OPACITY = 0.34;
-const MAX_TILE_CACHE = 28;
+const BASE_OPACITY = 0.5;
+const MAX_TILE_CACHE = 60;
 const MAX_ASSIGNMENTS = 80;
 
 export function initTypographicBackground() {
@@ -90,21 +83,22 @@ class TypographicBackground {
     context.fillRect(0, 0, this.width, this.height);
 
     const elapsed = (time - this.startedAt) / 1000;
-    const spacing = TILE_SIZE + TILE_GAP;
+    const spacingX = TILE_SIZE + TILE_GAP_X;
+    const spacingY = TILE_SIZE + TILE_GAP_Y;
     const cameraX = -elapsed * SPEED_X;
     const cameraY = -elapsed * SPEED_Y;
-    const minCol = Math.floor((cameraX - spacing) / spacing) - 1;
-    const maxCol = Math.ceil((cameraX + this.width + spacing) / spacing) + 1;
-    const minRow = Math.floor((cameraY - spacing) / spacing) - 1;
-    const maxRow = Math.ceil((cameraY + this.height + spacing) / spacing) + 1;
+    const minCol = Math.floor((cameraX - spacingX) / spacingX) - 1;
+    const maxCol = Math.ceil((cameraX + this.width + spacingX) / spacingX) + 1;
+    const minRow = Math.floor((cameraY - spacingY) / spacingY) - 1;
+    const maxRow = Math.ceil((cameraY + this.height + spacingY) / spacingY) + 1;
     const visibleKeys = new Set();
 
     for (let worldRow = minRow; worldRow <= maxRow; worldRow++) {
-      const rowStagger = Math.abs(worldRow % 2) * spacing * 0.5;
-      const y = worldRow * spacing - cameraY;
+      const rowStagger = Math.abs(worldRow % 2) * spacingX * 0.5;
+      const y = worldRow * spacingY - cameraY;
 
       for (let worldCol = minCol; worldCol <= maxCol; worldCol++) {
-        const x = worldCol * spacing + rowStagger - cameraX;
+        const x = worldCol * spacingX + rowStagger - cameraX;
         if (x < -TILE_SIZE || x > this.width + TILE_SIZE || y < -TILE_SIZE || y > this.height + TILE_SIZE) {
           continue;
         }
@@ -357,13 +351,11 @@ function pickGlyph(glyphPalette, density, x, y) {
 function estimateInk(text, size, weight, width) {
   const tokenWeight =
     {
-      '.': 0.08,
-      'ㅇ': 0.28,
       um: 0.34,
       '어': 0.48,
       UM: 0.56,
-      'ㅁ': 0.72,
-      '엄': 0.92,
+      'ㅁ': 0.62,
+      '엄': 0.68,
     }[text] ?? 0.5;
   return tokenWeight * size * (weight / 900) * Math.max(width, 1);
 }

@@ -37,6 +37,10 @@ body {
   pointer-events: none;
 }
 
+body.game-active #typographic-bg {
+  display: none;
+}
+
 #app {
   position: relative;
   z-index: 1;

@@ -1,6 +1,7 @@
 import { GENERATIONS } from '../core/quiz-core.js';
 
 export function showScreen(id) {
+  document.body.classList.toggle('game-active', id === 'game-screen');
   document.querySelectorAll('.screen').forEach((screen) => {
     screen.classList.toggle('active', screen.id === id);
   });

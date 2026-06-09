@@ -54,18 +54,30 @@
           </div>
         </div>
 
-        <button class="background-toggle" id="background-toggle" type="button" aria-label="배경만 보기">
-          <svg class="icon-eye" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
-            <circle cx="12" cy="12" r="3" />
-          </svg>
-          <svg class="icon-eye-off" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M3 3l18 18" />
-            <path d="M10.7 5.2A9.7 9.7 0 0 1 12 5c6 0 9.5 7 9.5 7a17 17 0 0 1-3 3.8" />
-            <path d="M6.2 6.7C3.9 8.3 2.5 12 2.5 12s3.5 7 9.5 7a9.8 9.8 0 0 0 4.1-.9" />
-            <path d="M9.9 9.9A3 3 0 0 0 14.1 14.1" />
-          </svg>
-        </button>
+        <div class="background-controls">
+          <button class="background-toggle" id="background-toggle" type="button" aria-label="배경만 보기">
+            <svg class="icon-eye" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            <svg class="icon-eye-off" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 3l18 18" />
+              <path d="M10.7 5.2A9.7 9.7 0 0 1 12 5c6 0 9.5 7 9.5 7a17 17 0 0 1-3 3.8" />
+              <path d="M6.2 6.7C3.9 8.3 2.5 12 2.5 12s3.5 7 9.5 7a9.8 9.8 0 0 0 4.1-.9" />
+              <path d="M9.9 9.9A3 3 0 0 0 14.1 14.1" />
+            </svg>
+          </button>
+          <button class="filter-toggle active" id="filter-toggle" type="button" aria-label="필터 끄기" aria-pressed="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 7h16" />
+              <path d="M6 12h12" />
+              <path d="M9 17h6" />
+              <circle cx="7" cy="7" r="1.5" />
+              <circle cx="15" cy="12" r="1.5" />
+              <circle cx="11" cy="17" r="1.5" />
+            </svg>
+          </button>
+        </div>
       </section>
 
       <section class="screen" id="room-screen">

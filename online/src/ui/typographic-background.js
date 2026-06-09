@@ -13,9 +13,14 @@ const SPEED_X = 27;
 const SPEED_Y = 16.2;
 const SAMPLE_STEP = 8;
 const MIN_ALPHA = 24;
-const BASE_OPACITY = 0.5;
+const BASE_OPACITY = 0.4;
 const MAX_TILE_CACHE = 60;
 const MAX_ASSIGNMENTS = 80;
+const TARGET_FRAME_MS = 1000 / 30;
+const ANALOG_BLEED_ALPHA = 0.22;
+const ANALOG_SOFT_FILL_ALPHA = 0.075;
+const GLOW_SCALE = 0.15;
+const GLOW_MIN_STRENGTH = 0.14;
 
 export function initTypographicBackground() {
   const canvas = document.querySelector('#typographic-bg');
@@ -35,8 +40,10 @@ class TypographicBackground {
     this.width = 0;
     this.height = 0;
     this.frame = 0;
+    this.lastDrawAt = 0;
     this.startedAt = performance.now();
     this.glyphPalette = createGlyphPalette();
+    this.filterEnabled = true;
     this.tileAssignments = new Map();
     this.tileCache = new Map();
     this.loadingIds = new Set();
@@ -49,7 +56,10 @@ class TypographicBackground {
     this.resizeObserver.observe(document.body);
     this.resize();
     const tick = (time) => {
-      this.draw(time);
+      if (time - this.lastDrawAt >= TARGET_FRAME_MS) {
+        this.draw(time);
+        this.lastDrawAt = time;
+      }
       this.frame = requestAnimationFrame(tick);
     };
     this.frame = requestAnimationFrame(tick);
@@ -58,6 +68,13 @@ class TypographicBackground {
   stop() {
     cancelAnimationFrame(this.frame);
     this.resizeObserver.disconnect();
+  }
+
+  setFilterEnabled(enabled) {
+    if (this.filterEnabled === enabled) return;
+    this.filterEnabled = enabled;
+    this.tileCache.clear();
+    this.pendingIds = [];
   }
 
   resize() {
@@ -77,6 +94,8 @@ class TypographicBackground {
   }
 
   draw(time) {
+    if (document.body.classList.contains('game-active')) return;
+
     const context = this.context;
     context.clearRect(0, 0, this.width, this.height);
     context.fillStyle = '#151722';
@@ -112,25 +131,14 @@ class TypographicBackground {
           continue;
         }
 
-        const pulse = 0.92 + Math.sin(elapsed * 0.9 + hashKey(key) * 0.001) * 0.08;
+        const keyHash = hashKey(key);
+        const pulse = 0.92 + Math.sin(elapsed * 0.9 + keyHash * 0.001) * 0.08;
         this.drawTile(tile, x, y, pulse);
         tile.lastUsedAt = performance.now();
       }
     }
     this.pruneAssignments(visibleKeys);
 
-    const gradient = context.createRadialGradient(
-      this.width / 2,
-      this.height / 2,
-      Math.min(this.width, this.height) * 0.12,
-      this.width / 2,
-      this.height / 2,
-      Math.max(this.width, this.height) * 0.68
-    );
-    gradient.addColorStop(0, 'rgba(21, 23, 34, 0.24)');
-    gradient.addColorStop(1, 'rgba(21, 23, 34, 0.78)');
-    context.fillStyle = gradient;
-    context.fillRect(0, 0, this.width, this.height);
   }
 
   drawTile(tile, x, y, pulse) {
@@ -139,14 +147,8 @@ class TypographicBackground {
     context.translate(x + TILE_SIZE / 2, y + TILE_SIZE / 2);
     context.rotate(-0.13);
     context.translate(-TILE_SIZE / 2, -TILE_SIZE / 2);
-    context.textBaseline = 'middle';
-    context.textAlign = 'center';
-
-    for (const glyph of tile.glyphs) {
-      context.font = glyph.font;
-      context.fillStyle = `rgba(${glyph.r}, ${glyph.g}, ${glyph.b}, ${glyph.alpha * pulse})`;
-      context.fillText(glyph.text, glyph.x, glyph.y);
-    }
+    context.globalAlpha = pulse;
+    context.drawImage(tile.canvas, 0, 0);
 
     context.restore();
   }
@@ -185,7 +187,7 @@ class TypographicBackground {
     try {
       const image = await loadArtwork(id);
       this.tileCache.set(id, {
-        ...createPokemonTile(image, this.glyphPalette),
+        ...createPokemonTile(image, this.glyphPalette, this.filterEnabled),
         lastUsedAt: performance.now(),
       });
       this.pruneTileCache();
@@ -238,7 +240,7 @@ function createGlyphPalette() {
   return variants.sort((a, b) => a.ink - b.ink);
 }
 
-function createPokemonTile(image, glyphPalette) {
+function createPokemonTile(image, glyphPalette, filterEnabled) {
   const source = drawArtworkToSource(image);
   const glyphs = [];
 
@@ -272,7 +274,120 @@ function createPokemonTile(image, glyphPalette) {
     }
   }
 
-  return { glyphs };
+  return {
+    ...renderTileCanvases(glyphs, filterEnabled),
+  };
+}
+
+function renderTileCanvases(glyphs, filterEnabled) {
+  const canvas = document.createElement('canvas');
+  canvas.width = TILE_SIZE;
+  canvas.height = TILE_SIZE;
+  const context = canvas.getContext('2d');
+
+  context.textBaseline = 'middle';
+  context.textAlign = 'center';
+
+  if (filterEnabled) {
+    bakeCheapGlow(context, glyphs);
+  }
+
+  for (const glyph of glyphs) {
+    if (filterEnabled) {
+      drawDepthGlyph(context, glyph);
+      drawAnalogBleedGlyph(context, glyph);
+    } else {
+      drawBaseGlyph(context, glyph);
+    }
+  }
+
+  return { canvas };
+}
+
+function drawBaseGlyph(context, glyph) {
+  context.font = glyph.font;
+  context.fillStyle = `rgba(${glyph.r}, ${glyph.g}, ${glyph.b}, ${glyph.alpha})`;
+  context.fillText(glyph.text, glyph.x, glyph.y);
+}
+
+function drawAnalogBleedGlyph(context, glyph) {
+  const alpha = glyph.alpha;
+  context.font = glyph.font;
+
+  context.fillStyle = `rgba(${glyph.r}, ${glyph.g}, ${glyph.b}, ${alpha * ANALOG_SOFT_FILL_ALPHA})`;
+  context.fillText(glyph.text, glyph.x - 1, glyph.y - 1);
+  context.fillText(glyph.text, glyph.x + 1, glyph.y - 1);
+  context.fillText(glyph.text, glyph.x - 1, glyph.y + 1);
+  context.fillText(glyph.text, glyph.x + 1, glyph.y + 1);
+  context.fillText(glyph.text, glyph.x, glyph.y - 1);
+  context.fillText(glyph.text, glyph.x, glyph.y + 1);
+
+  context.fillStyle = `rgba(${glyph.r}, ${glyph.g}, ${glyph.b}, ${alpha * ANALOG_BLEED_ALPHA})`;
+  context.fillText(glyph.text, glyph.x - 2, glyph.y);
+  context.fillText(glyph.text, glyph.x + 2, glyph.y);
+
+  context.fillStyle = `rgba(${Math.min(glyph.r + 26, 255)}, ${Math.min(glyph.g + 26, 255)}, ${Math.min(
+    glyph.b + 26,
+    255
+  )}, ${alpha * 0.16})`;
+  context.fillText(glyph.text, glyph.x - 1, glyph.y);
+  context.fillText(glyph.text, glyph.x + 1, glyph.y);
+
+  context.fillStyle = `rgba(${glyph.r}, ${glyph.g}, ${glyph.b}, ${alpha})`;
+  context.fillText(glyph.text, glyph.x, glyph.y);
+}
+
+function drawDepthGlyph(context, glyph) {
+  const alpha = glyph.alpha;
+  context.font = glyph.font;
+
+  context.fillStyle = `rgba(7, 10, 20, ${alpha * 0.18})`;
+  context.fillText(glyph.text, glyph.x + 1, glyph.y + 2);
+
+  context.fillStyle = `rgba(${Math.min(glyph.r + 42, 255)}, ${Math.min(glyph.g + 42, 255)}, ${Math.min(
+    glyph.b + 42,
+    255
+  )}, ${alpha * 0.12})`;
+  context.fillText(glyph.text, glyph.x - 1, glyph.y - 1);
+}
+
+function bakeCheapGlow(targetContext, glyphs) {
+  const glowCanvas = document.createElement('canvas');
+  glowCanvas.width = Math.ceil(TILE_SIZE * GLOW_SCALE);
+  glowCanvas.height = Math.ceil(TILE_SIZE * GLOW_SCALE);
+  const glowContext = glowCanvas.getContext('2d');
+  glowContext.textBaseline = 'middle';
+  glowContext.textAlign = 'center';
+  glowContext.globalCompositeOperation = 'lighter';
+
+  for (const glyph of glyphs) {
+    drawCheapGlowGlyph(glowContext, glyph, GLOW_SCALE);
+  }
+
+  targetContext.save();
+  targetContext.globalCompositeOperation = 'lighter';
+  targetContext.imageSmoothingEnabled = true;
+  targetContext.globalAlpha = 0.2;
+  targetContext.drawImage(glowCanvas, 0, 0, TILE_SIZE, TILE_SIZE);
+  targetContext.restore();
+}
+
+function drawCheapGlowGlyph(context, glyph, scale) {
+  const brightness = relativeBrightness(glyph.r, glyph.g, glyph.b);
+  const saturation = relativeSaturation(glyph.r, glyph.g, glyph.b);
+  const glowStrength = 0.08 + brightness * 0.12 + saturation * 0.18;
+  if (glowStrength < GLOW_MIN_STRENGTH) return;
+
+  const alpha = glyph.alpha * glowStrength;
+  context.font = scaleFont(glyph.font, scale);
+  context.fillStyle = `rgba(${Math.min(glyph.r + 38, 255)}, ${Math.min(glyph.g + 38, 255)}, ${Math.min(
+    glyph.b + 38,
+    255
+  )}, ${alpha})`;
+  context.fillText(glyph.text, glyph.x * scale, glyph.y * scale);
+  context.fillStyle = `rgba(${glyph.r}, ${glyph.g}, ${glyph.b}, ${alpha * 0.42})`;
+  context.fillText(glyph.text, (glyph.x - 1.6) * scale, glyph.y * scale);
+  context.fillText(glyph.text, (glyph.x + 1.6) * scale, glyph.y * scale);
 }
 
 function drawArtworkToSource(image) {
@@ -362,6 +477,16 @@ function estimateInk(text, size, weight, width) {
 
 function relativeBrightness(r, g, b) {
   return (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+}
+
+function relativeSaturation(r, g, b) {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  return max === 0 ? 0 : (max - min) / max;
+}
+
+function scaleFont(font, scale) {
+  return font.replace(/(\d+(?:\.\d+)?)px/, (_, size) => `${Number(size) * scale}px`);
 }
 
 function boostColor(r, g, b, brightness) {

@@ -48,6 +48,7 @@ const QUESTION_DELAY_MS = 3000;
 const QUESTION_REPLACE_DELAY_MS = 1200;
 const MIN_REACTION_MS = 100;
 const ADJUDICATION_WAIT_MS = 650;
+const BACKGROUND_FILTER_STORAGE_KEY = 'umkemon-online-background-filter-enabled';
 
 const pokemonDb = getPokemonDb();
 const selectedGenerations = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
@@ -87,8 +88,9 @@ let pendingStartMessage = null;
 let startQuestionTimer = null;
 let roundTimeoutTimer = null;
 let acceptingAnswers = false;
+let backgroundRenderer = null;
 
-initTypographicBackground();
+backgroundRenderer = initTypographicBackground();
 initGenerationGrid(selectedGenerations);
 initSegmentedControl('#mode-select', 'mode', (mode) => {
   quizMode = mode;
@@ -104,7 +106,9 @@ document.querySelector('#start-game-btn').addEventListener('click', startGameAsH
 document.querySelector('#room-code-btn').addEventListener('click', copyRoomCode);
 document.querySelector('#chat-form').addEventListener('submit', submitAnswer);
 document.querySelector('#background-toggle').addEventListener('click', toggleBackgroundOnly);
+document.querySelector('#filter-toggle').addEventListener('click', toggleBackgroundFilter);
 
+setBackgroundFilterEnabled(loadBackgroundFilterPreference());
 bootstrapAuth();
 
 async function bootstrapAuth() {
@@ -218,6 +222,37 @@ function toggleBackgroundOnly() {
   const homeScreen = document.querySelector('#home-screen');
   const enabled = homeScreen.classList.toggle('background-only');
   document.querySelector('#background-toggle').setAttribute('aria-label', enabled ? '메뉴 보기' : '배경만 보기');
+}
+
+function toggleBackgroundFilter() {
+  const enabled = !document.querySelector('#filter-toggle').classList.contains('active');
+  saveBackgroundFilterPreference(enabled);
+  setBackgroundFilterEnabled(enabled);
+}
+
+function setBackgroundFilterEnabled(enabled) {
+  const toggle = document.querySelector('#filter-toggle');
+  backgroundRenderer?.setFilterEnabled(enabled);
+  toggle.classList.toggle('active', enabled);
+  toggle.setAttribute('aria-pressed', String(enabled));
+  toggle.setAttribute('aria-label', enabled ? '필터 끄기' : '필터 켜기');
+}
+
+function loadBackgroundFilterPreference() {
+  try {
+    const stored = localStorage.getItem(BACKGROUND_FILTER_STORAGE_KEY);
+    return stored === null ? true : stored === 'true';
+  } catch {
+    return true;
+  }
+}
+
+function saveBackgroundFilterPreference(enabled) {
+  try {
+    localStorage.setItem(BACKGROUND_FILTER_STORAGE_KEY, String(enabled));
+  } catch {
+    // Ignore storage failures; the toggle still applies for this session.
+  }
 }
 
 function bindPlayers(hostId) {

@@ -40,10 +40,12 @@ jobs:
 
       - name: Prepare static site
         run: |
-          mkdir -p _site/online
+          mkdir -p _site/online/src/data
           cp index.html _site/index.html
           cp favicon.svg _site/favicon.svg
           cp pokemon_data.js _site/pokemon_data.js
+          cp typographic-background-main.js _site/typographic-background-main.js
+          cp online/src/data/popular-background-pokemon.js _site/online/src/data/popular-background-pokemon.js
           cp -R online/dist/* _site/online/
           touch _site/.nojekyll
 

@@ -7,49 +7,65 @@
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
   </head>
   <body>
+    <canvas id="typographic-bg" aria-hidden="true"></canvas>
     <main id="app">
       <section class="screen active" id="home-screen">
-        <div class="brand">
-          <h1>엄켓몬 챔피언스</h1>
-          <a class="mode-link" href="../">일반모드로 돌아가기</a>
-        </div>
+        <div class="home-content" id="home-content">
+          <div class="brand">
+            <h1>엄켓몬 챔피언스</h1>
+            <a class="mode-link" href="../">일반모드로 돌아가기</a>
+          </div>
 
-        <div class="panel lobby-panel">
-          <label class="field">
-            <span>닉네임</span>
-            <input id="nickname-input" maxlength="12" autocomplete="nickname" />
-          </label>
+          <div class="panel lobby-panel">
+            <label class="field">
+              <span>닉네임</span>
+              <input id="nickname-input" maxlength="12" autocomplete="nickname" />
+            </label>
 
-          <div class="settings-grid">
-            <div>
-              <h2>세대 선택</h2>
-              <div class="gen-grid" id="generation-grid"></div>
-            </div>
-
-            <div>
-              <h2>퀴즈 모드</h2>
-              <div class="segmented" id="mode-select">
-                <button class="selected" data-mode="pixelate">픽셀화</button>
-                <button data-mode="silhouette">실루엣</button>
+            <div class="settings-grid">
+              <div>
+                <h2>세대 선택</h2>
+                <div class="gen-grid" id="generation-grid"></div>
               </div>
 
-              <h2>목표 점수</h2>
-              <div class="segmented" id="target-score-select">
-                <button data-score="5">5점</button>
-                <button class="selected" data-score="10">10점</button>
-                <button data-score="15">15점</button>
+              <div>
+                <h2>퀴즈 모드</h2>
+                <div class="segmented" id="mode-select">
+                  <button class="selected" data-mode="pixelate">픽셀화</button>
+                  <button data-mode="silhouette">실루엣</button>
+                </div>
+
+                <h2>목표 점수</h2>
+                <div class="segmented" id="target-score-select">
+                  <button data-score="5">5점</button>
+                  <button class="selected" data-score="10">10점</button>
+                  <button data-score="15">15점</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="room-actions">
+              <button class="primary" id="create-room-btn">방 만들기</button>
+              <div class="join-row">
+                <input id="join-code-input" placeholder="방 코드" autocomplete="off" />
+                <button id="join-room-btn">참가</button>
               </div>
             </div>
           </div>
-
-          <div class="room-actions">
-            <button class="primary" id="create-room-btn">방 만들기</button>
-            <div class="join-row">
-              <input id="join-code-input" placeholder="방 코드" autocomplete="off" />
-              <button id="join-room-btn">참가</button>
-            </div>
-          </div>
         </div>
+
+        <button class="background-toggle" id="background-toggle" type="button" aria-label="배경만 보기">
+          <svg class="icon-eye" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          <svg class="icon-eye-off" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 3l18 18" />
+            <path d="M10.7 5.2A9.7 9.7 0 0 1 12 5c6 0 9.5 7 9.5 7a17 17 0 0 1-3 3.8" />
+            <path d="M6.2 6.7C3.9 8.3 2.5 12 2.5 12s3.5 7 9.5 7a9.8 9.8 0 0 0 4.1-.9" />
+            <path d="M9.9 9.9A3 3 0 0 0 14.1 14.1" />
+          </svg>
+        </button>
       </section>
 
       <section class="screen" id="room-screen">

@@ -41,6 +41,7 @@ import {
   showOriginalImage,
   showScreen,
 } from './ui/app-ui.js';
+import { initTypographicBackground } from './ui/typographic-background.js';
 
 const ROUND_SECONDS = 20;
 const QUESTION_DELAY_MS = 3000;
@@ -87,6 +88,7 @@ let startQuestionTimer = null;
 let roundTimeoutTimer = null;
 let acceptingAnswers = false;
 
+initTypographicBackground();
 initGenerationGrid(selectedGenerations);
 initSegmentedControl('#mode-select', 'mode', (mode) => {
   quizMode = mode;
@@ -101,6 +103,7 @@ document.querySelector('#leave-room-btn').addEventListener('click', leaveRoom);
 document.querySelector('#start-game-btn').addEventListener('click', startGameAsHost);
 document.querySelector('#room-code-btn').addEventListener('click', copyRoomCode);
 document.querySelector('#chat-form').addEventListener('submit', submitAnswer);
+document.querySelector('#background-toggle').addEventListener('click', toggleBackgroundOnly);
 
 bootstrapAuth();
 
@@ -209,6 +212,12 @@ function enterRoomScreen(roomCode) {
 function setLobbyEnabled(enabled) {
   document.querySelector('#create-room-btn').disabled = !enabled;
   document.querySelector('#join-room-btn').disabled = !enabled;
+}
+
+function toggleBackgroundOnly() {
+  const homeScreen = document.querySelector('#home-screen');
+  const enabled = homeScreen.classList.toggle('background-only');
+  document.querySelector('#background-toggle').setAttribute('aria-label', enabled ? '메뉴 보기' : '배경만 보기');
 }
 
 function bindPlayers(hostId) {

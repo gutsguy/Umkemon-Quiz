@@ -27,15 +27,18 @@ export function initTypographicBackground() {
   if (!canvas) return null;
 
   const context = canvas.getContext('2d');
-  const renderer = new TypographicBackground(canvas, context);
+  const compareMode = new URLSearchParams(window.location.search).has('compare');
+  const renderer = new TypographicBackground(canvas, context, compareMode);
   renderer.start();
   return renderer;
 }
 
 class TypographicBackground {
-  constructor(canvas, context) {
+  constructor(canvas, context, compareMode = false) {
     this.canvas = canvas;
     this.context = context;
+    this.compareMode = compareMode;
+    this.divider = 0.5;
     this.pixelRatio = 1;
     this.width = 0;
     this.height = 0;
@@ -44,12 +47,24 @@ class TypographicBackground {
     this.startedAt = performance.now();
     this.glyphPalette = createGlyphPalette();
     this.filterEnabled = true;
+    this.renderingEnabled = true;
     this.tileAssignments = new Map();
     this.tileCache = new Map();
     this.loadingIds = new Set();
     this.recentIds = [];
     this.pendingIds = [];
     this.resizeObserver = new ResizeObserver(() => this.resize());
+    if (compareMode) this.bindCompareTracking();
+  }
+
+  bindCompareTracking() {
+    const follow = (event) => {
+      this.divider = clamp(event.clientX / Math.max(this.width, 1), 0.02, 0.98);
+    };
+    // pointerdown so a tap jumps the divider on touch devices, where
+    // pointermove only fires while a finger is dragging.
+    window.addEventListener('pointermove', follow, true);
+    window.addEventListener('pointerdown', follow, true);
   }
 
   start() {
@@ -77,6 +92,14 @@ class TypographicBackground {
     this.pendingIds = [];
   }
 
+  setRenderingEnabled(enabled) {
+    if (this.renderingEnabled === enabled) return;
+    this.renderingEnabled = enabled;
+    if (!enabled) {
+      this.pendingIds = [];
+    }
+  }
+
   resize() {
     const nextPixelRatio = Math.min(window.devicePixelRatio || 1, 2);
     const nextWidth = window.innerWidth;
@@ -100,6 +123,7 @@ class TypographicBackground {
     context.clearRect(0, 0, this.width, this.height);
     context.fillStyle = '#151722';
     context.fillRect(0, 0, this.width, this.height);
+    if (!this.renderingEnabled) return;
 
     const elapsed = (time - this.startedAt) / 1000;
     const spacingX = TILE_SIZE + TILE_GAP_X;
@@ -111,6 +135,7 @@ class TypographicBackground {
     const minRow = Math.floor((cameraY - spacingY) / spacingY) - 1;
     const maxRow = Math.ceil((cameraY + this.height + spacingY) / spacingY) + 1;
     const visibleKeys = new Set();
+    const drawList = [];
 
     for (let worldRow = minRow; worldRow <= maxRow; worldRow++) {
       const rowStagger = Math.abs(worldRow % 2) * spacingX * 0.5;
@@ -133,22 +158,56 @@ class TypographicBackground {
 
         const keyHash = hashKey(key);
         const pulse = 0.92 + Math.sin(elapsed * 0.9 + keyHash * 0.001) * 0.08;
-        this.drawTile(tile, x, y, pulse);
+        const breathe = 1 + Math.sin(elapsed * 0.55 + keyHash * 0.0007) * 0.015;
+        drawList.push({ tile, x, y, pulse, breathe });
         tile.lastUsedAt = performance.now();
       }
     }
     this.pruneAssignments(visibleKeys);
 
+    if (!this.compareMode) {
+      for (const item of drawList) {
+        this.drawTile(item.tile, item.x, item.y, item.pulse, item.breathe, this.filterEnabled);
+      }
+      return;
+    }
+
+    const dividerX = this.width * this.divider;
+    context.save();
+    context.beginPath();
+    context.rect(0, 0, dividerX, this.height);
+    context.clip();
+    for (const item of drawList) {
+      this.drawTile(item.tile, item.x, item.y, item.pulse, item.breathe, this.filterEnabled);
+    }
+    context.restore();
+
+    context.save();
+    context.beginPath();
+    context.rect(dividerX, 0, this.width - dividerX, this.height);
+    context.clip();
+    for (const item of drawList) {
+      this.drawTile(item.tile, item.x, item.y, item.pulse, item.breathe, true);
+    }
+    context.restore();
+
+    drawCompareDivider(context, dividerX, this.height);
   }
 
-  drawTile(tile, x, y, pulse) {
+  drawTile(tile, x, y, pulse, breathe, filtered) {
     const context = this.context;
+    const useEnhanced = filtered && tile.enhancedCanvas;
     context.save();
     context.translate(x + TILE_SIZE / 2, y + TILE_SIZE / 2);
     context.rotate(-0.13);
+    if (useEnhanced) context.scale(breathe, breathe);
     context.translate(-TILE_SIZE / 2, -TILE_SIZE / 2);
+    if (useEnhanced && tile.shadowCanvas) {
+      context.globalAlpha = pulse * 0.45;
+      context.drawImage(tile.shadowCanvas, 8, 11, TILE_SIZE, TILE_SIZE);
+    }
     context.globalAlpha = pulse;
-    context.drawImage(tile.canvas, 0, 0);
+    context.drawImage(useEnhanced ? tile.enhancedCanvas : tile.baseCanvas, 0, 0);
 
     context.restore();
   }
@@ -187,7 +246,7 @@ class TypographicBackground {
     try {
       const image = await loadArtwork(id);
       this.tileCache.set(id, {
-        ...createPokemonTile(image, this.glyphPalette, this.filterEnabled),
+        ...createPokemonTile(image, this.glyphPalette, this.filterEnabled, this.compareMode),
         lastUsedAt: performance.now(),
       });
       this.pruneTileCache();
@@ -240,9 +299,10 @@ function createGlyphPalette() {
   return variants.sort((a, b) => a.ink - b.ink);
 }
 
-function createPokemonTile(image, glyphPalette, filterEnabled) {
+function createPokemonTile(image, glyphPalette, filterEnabled, compareMode = false) {
   const source = drawArtworkToSource(image);
   const glyphs = [];
+  const needEnhanced = filterEnabled || compareMode;
 
   for (let y = 0; y < TILE_SIZE; y += SAMPLE_STEP) {
     for (let x = 0; x < TILE_SIZE; ) {
@@ -258,6 +318,7 @@ function createPokemonTile(image, glyphPalette, filterEnabled) {
       const glyph = pickGlyph(glyphPalette, density, x, y);
       const alpha = BASE_OPACITY * (0.45 + sample.a / 255) * (0.72 + detail * 0.32);
       const color = boostColor(sample.r, sample.g, sample.b, brightness);
+      const shading = needEnhanced ? sampleShading(source, x, y, brightness, sample.a) : null;
 
       glyphs.push({
         text: glyph.text,
@@ -268,18 +329,26 @@ function createPokemonTile(image, glyphPalette, filterEnabled) {
         g: color.g,
         b: color.b,
         alpha: Math.min(alpha, 0.58),
+        lighting: shading ? shading.lighting : 0.5,
+        rim: shading ? shading.rim : 0,
       });
 
       x += Math.max(glyph.width + 1.5, SAMPLE_STEP * 0.72);
     }
   }
 
-  return {
-    ...renderTileCanvases(glyphs, filterEnabled),
-  };
+  const tile = {};
+  if (needEnhanced) {
+    tile.enhancedCanvas = renderEnhancedTileCanvas(glyphs);
+    tile.shadowCanvas = bakeTileShadow(tile.enhancedCanvas);
+  }
+  if (!filterEnabled) {
+    tile.baseCanvas = renderBaseTileCanvas(glyphs);
+  }
+  return tile;
 }
 
-function renderTileCanvases(glyphs, filterEnabled) {
+function renderBaseTileCanvas(glyphs) {
   const canvas = document.createElement('canvas');
   canvas.width = TILE_SIZE;
   canvas.height = TILE_SIZE;
@@ -288,20 +357,11 @@ function renderTileCanvases(glyphs, filterEnabled) {
   context.textBaseline = 'middle';
   context.textAlign = 'center';
 
-  if (filterEnabled) {
-    bakeCheapGlow(context, glyphs);
-  }
-
   for (const glyph of glyphs) {
-    if (filterEnabled) {
-      drawDepthGlyph(context, glyph);
-      drawAnalogBleedGlyph(context, glyph);
-    } else {
-      drawBaseGlyph(context, glyph);
-    }
+    drawBaseGlyph(context, glyph);
   }
 
-  return { canvas };
+  return canvas;
 }
 
 function drawBaseGlyph(context, glyph) {
@@ -337,18 +397,84 @@ function drawAnalogBleedGlyph(context, glyph) {
   context.fillText(glyph.text, glyph.x, glyph.y);
 }
 
-function drawDepthGlyph(context, glyph) {
+function renderEnhancedTileCanvas(glyphs) {
+  const canvas = document.createElement('canvas');
+  canvas.width = TILE_SIZE;
+  canvas.height = TILE_SIZE;
+  const context = canvas.getContext('2d');
+  context.textBaseline = 'middle';
+  context.textAlign = 'center';
+
+  bakeCheapGlow(context, glyphs);
+  for (const glyph of glyphs) {
+    drawLitDepthGlyph(context, glyph);
+    drawAnalogBleedGlyph(context, glyph);
+  }
+  return canvas;
+}
+
+function drawLitDepthGlyph(context, glyph) {
   const alpha = glyph.alpha;
   context.font = glyph.font;
 
-  context.fillStyle = `rgba(7, 10, 20, ${alpha * 0.18})`;
-  context.fillText(glyph.text, glyph.x + 1, glyph.y + 2);
+  const shade = 0.1 + (1 - glyph.lighting) * 0.26;
+  context.fillStyle = `rgba(7, 10, 20, ${alpha * shade})`;
+  context.fillText(glyph.text, glyph.x + 1.5, glyph.y + 2);
 
-  context.fillStyle = `rgba(${Math.min(glyph.r + 42, 255)}, ${Math.min(glyph.g + 42, 255)}, ${Math.min(
-    glyph.b + 42,
+  const lift = 0.08 + glyph.lighting * 0.26;
+  context.fillStyle = `rgba(${Math.min(glyph.r + 70, 255)}, ${Math.min(glyph.g + 70, 255)}, ${Math.min(
+    glyph.b + 70,
     255
-  )}, ${alpha * 0.12})`;
-  context.fillText(glyph.text, glyph.x - 1, glyph.y - 1);
+  )}, ${alpha * lift})`;
+  context.fillText(glyph.text, glyph.x - 1, glyph.y - 1.5);
+
+  if (glyph.rim > 0.18) {
+    context.fillStyle = `rgba(255, 244, 224, ${alpha * glyph.rim * 0.4})`;
+    context.fillText(glyph.text, glyph.x - 1.5, glyph.y - 1.5);
+  }
+}
+
+// Estimate per-glyph lighting from the artwork's local luminance slope,
+// assuming a light source at the upper-left. `rim` marks silhouette edges
+// facing the light so they can catch a bright rim highlight.
+function sampleShading(source, x, y, brightness, centerAlpha) {
+  const brightnessAt = (dx, dy) => {
+    const neighbor = sampleSource(source, x + dx, y + dy);
+    return neighbor.a < MIN_ALPHA ? brightness : relativeBrightness(neighbor.r, neighbor.g, neighbor.b);
+  };
+  const gradX = brightnessAt(SAMPLE_STEP, 0) - brightnessAt(-SAMPLE_STEP, 0);
+  const gradY = brightnessAt(0, SAMPLE_STEP) - brightnessAt(0, -SAMPLE_STEP);
+  const lighting = clamp(0.5 - gradX * 1.1 - gradY * 1.1, 0, 1);
+  const upLeftAlpha = sampleSource(source, x - SAMPLE_STEP, y - SAMPLE_STEP).a;
+  const rim = clamp((centerAlpha - upLeftAlpha) / 255, 0, 1);
+  return { lighting, rim };
+}
+
+// Bake a soft dark silhouette of the finished tile at low resolution;
+// upscaling it at draw time produces a cheap blurred drop shadow.
+function bakeTileShadow(tileCanvas) {
+  const size = Math.ceil(TILE_SIZE * GLOW_SCALE);
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext('2d');
+  context.drawImage(tileCanvas, 0, 0, size, size);
+  context.globalCompositeOperation = 'source-in';
+  context.fillStyle = 'rgba(5, 7, 16, 0.85)';
+  context.fillRect(0, 0, size, size);
+  return canvas;
+}
+
+function drawCompareDivider(context, dividerX, height) {
+  context.save();
+  context.fillStyle = 'rgba(255, 255, 255, 0.55)';
+  context.fillRect(dividerX - 1, 0, 2, height);
+  context.font = `700 13px ${FONT_FAMILY}`;
+  context.textBaseline = 'top';
+  context.textAlign = 'left';
+  context.fillStyle = 'rgba(255, 255, 255, 0.78)';
+  context.fillText('필터 ON', dividerX + 12, 14);
+  context.restore();
 }
 
 function bakeCheapGlow(targetContext, glyphs) {
@@ -367,7 +493,7 @@ function bakeCheapGlow(targetContext, glyphs) {
   targetContext.save();
   targetContext.globalCompositeOperation = 'lighter';
   targetContext.imageSmoothingEnabled = true;
-  targetContext.globalAlpha = 0.2;
+  targetContext.globalAlpha = 0.26;
   targetContext.drawImage(glowCanvas, 0, 0, TILE_SIZE, TILE_SIZE);
   targetContext.restore();
 }
@@ -490,12 +616,12 @@ function scaleFont(font, scale) {
 }
 
 function boostColor(r, g, b, brightness) {
-  const boost = brightness < 0.32 ? 1.38 : 1.16;
-  return {
-    r: clamp(Math.round(r * boost + 18), 0, 255),
-    g: clamp(Math.round(g * boost + 18), 0, 255),
-    b: clamp(Math.round(b * boost + 18), 0, 255),
-  };
+  const lift = brightness < 0.32 ? 1.32 : 1.12;
+  const mean = (r + g + b) / 3;
+  // Push channels away from their mean to boost saturation without the
+  // gray wash that a flat additive lift causes.
+  const saturate = (value) => clamp(Math.round((mean + (value - mean) * 1.4) * lift + 14), 0, 255);
+  return { r: saturate(r), g: saturate(g), b: saturate(b) };
 }
 
 function clamp(value, min, max) {

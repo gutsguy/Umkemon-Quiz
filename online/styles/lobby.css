@@ -40,7 +40,8 @@
 }
 
 .background-toggle,
-.filter-toggle {
+.filter-toggle,
+.pokemon-background-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -56,7 +57,8 @@
 }
 
 .background-toggle svg,
-.filter-toggle svg {
+.filter-toggle svg,
+.pokemon-background-toggle svg {
   width: 20px;
   height: 20px;
   fill: none;
@@ -66,7 +68,8 @@
   stroke-linejoin: round;
 }
 
-.filter-toggle.active {
+.filter-toggle.active,
+.pokemon-background-toggle.active {
   border-color: var(--accent-2);
   color: #dcfff8;
 }

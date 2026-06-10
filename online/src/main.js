@@ -107,8 +107,10 @@ document.querySelector('#room-code-btn').addEventListener('click', copyRoomCode)
 document.querySelector('#chat-form').addEventListener('submit', submitAnswer);
 document.querySelector('#background-toggle').addEventListener('click', toggleBackgroundOnly);
 document.querySelector('#filter-toggle').addEventListener('click', toggleBackgroundFilter);
+document.querySelector('#pokemon-background-toggle').addEventListener('click', togglePokemonBackground);
 
 setBackgroundFilterEnabled(loadBackgroundFilterPreference());
+setPokemonBackgroundEnabled(true);
 bootstrapAuth();
 
 async function bootstrapAuth() {
@@ -236,6 +238,19 @@ function setBackgroundFilterEnabled(enabled) {
   toggle.classList.toggle('active', enabled);
   toggle.setAttribute('aria-pressed', String(enabled));
   toggle.setAttribute('aria-label', enabled ? '필터 끄기' : '필터 켜기');
+}
+
+function togglePokemonBackground() {
+  const enabled = !document.querySelector('#pokemon-background-toggle').classList.contains('active');
+  setPokemonBackgroundEnabled(enabled);
+}
+
+function setPokemonBackgroundEnabled(enabled) {
+  const toggle = document.querySelector('#pokemon-background-toggle');
+  backgroundRenderer?.setRenderingEnabled(enabled);
+  toggle.classList.toggle('active', enabled);
+  toggle.setAttribute('aria-pressed', String(enabled));
+  toggle.setAttribute('aria-label', enabled ? '포켓몬 배경 끄기' : '포켓몬 배경 켜기');
 }
 
 function loadBackgroundFilterPreference() {

@@ -43,6 +43,8 @@ jobs:
           mkdir -p _site/online/src/data
           cp index.html _site/index.html
           cp favicon.svg _site/favicon.svg
+          cp google7999ae9328424467.html _site/google7999ae9328424467.html
+          cp sitemap.xml _site/sitemap.xml
           cp pokemon_data.js _site/pokemon_data.js
           cp typographic-background-main.js _site/typographic-background-main.js
           cp online/src/data/popular-background-pokemon.js _site/online/src/data/popular-background-pokemon.js
